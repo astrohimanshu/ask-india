@@ -1,0 +1,65 @@
+[project]
+name = "ask-india"
+version = "0.1.0"
+description = "Grounded question answering and claim verification over official Indian government datasets."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+license = { text = "MIT" }
+dependencies = [
+  "askindia-api",
+  "askindia-agents",
+  "askindia-ingestion",
+  "askindia-evals",
+  "askindia-training",
+]
+
+[dependency-groups]
+dev = [
+  "pytest>=8.3",
+  "pytest-asyncio>=0.24",
+  "pytest-cov>=5",
+  "ruff>=0.6",
+  "mypy>=1.11",
+]
+
+[tool.uv.workspace]
+members = ["apps/api", "packages/*"]
+
+[tool.uv.sources]
+askindia-api = { workspace = true }
+askindia-agents = { workspace = true }
+askindia-ingestion = { workspace = true }
+askindia-evals = { workspace = true }
+askindia-training = { workspace = true }
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["apps/api/src", "packages/*/src", "tests", "scripts"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "N", "W", "SIM", "RUF"]
+ignore = ["RUF012"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["askindia_api", "askindia_agents", "askindia_ingestion", "askindia_evals", "askindia_training"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unused_ignores = true
+mypy_path = "apps/api/src:packages/agents/src:packages/ingestion/src:packages/evals/src:packages/training/src"
+packages = ["askindia_api", "askindia_agents", "askindia_ingestion", "askindia_evals", "askindia_training"]
+
+[[tool.mypy.overrides]]
+module = ["sqlglot.*", "litellm.*", "langfuse.*", "pandas.*", "pdfplumber.*", "fastembed.*", "langgraph.*", "psycopg.*", "psycopg_pool.*", "pgvector.*", "prometheus_client.*", "slowapi.*", "sse_starlette.*", "httpx.*", "yaml.*", "openpyxl.*", "xlrd.*", "camelot.*", "rank_bm25.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "apps/api/tests", "packages/agents/tests", "packages/ingestion/tests", "packages/evals/tests", "packages/training/tests"]
+asyncio_mode = "auto"
+markers = [
+  "integration: requires the local Postgres/Ollama stack",
+  "live: requires outbound access to government data sources",
+]
+addopts = "-m 'not integration and not live' -q"
