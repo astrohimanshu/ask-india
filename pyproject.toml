@@ -62,4 +62,4 @@ markers = [
   "integration: requires the local Postgres/Ollama stack",
   "live: requires outbound access to government data sources",
 ]
-addopts = "-m 'not integration and not live' -q"
+addopts = "-m 'not integration and not live' -q --import-mode=importlib"
