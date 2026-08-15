@@ -37,9 +37,9 @@ ALTER DEFAULT PRIVILEGES FOR ROLE askindia_app IN SCHEMA rag  GRANT SELECT ON TA
 ALTER ROLE askindia_ro SET default_transaction_read_only = on;
 ALTER ROLE askindia_ro SET statement_timeout = '10s';
 ALTER ROLE askindia_ro SET idle_in_transaction_session_timeout = '30s';
-ALTER ROLE askindia_ro SET search_path = data;
+ALTER ROLE askindia_ro SET search_path = data, public;
 
-ALTER ROLE askindia_app SET search_path = data, meta, rag, app;
+ALTER ROLE askindia_app SET search_path = data, meta, rag, app, public;
 
 -- Everything below is created as the application role so it owns the objects.
 SET ROLE askindia_app;

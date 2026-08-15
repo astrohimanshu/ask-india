@@ -4,10 +4,13 @@ version = "0.1.0"
 description = "LangGraph agent: schema retrieval, SQL generation, execution, guards."
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "fastembed>=0.4",
     "litellm>=1.50",
+    "pgvector>=0.3",
     "psycopg[binary,pool]>=3.2",
     "pydantic>=2.8",
     "pydantic-settings>=2.4",
+    "pyyaml>=6",
     "sqlglot>=25",
 ]
 
