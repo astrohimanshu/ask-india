@@ -4,9 +4,13 @@ Plain-English questions about India, answered from official government datasets 
 statistical claims checked against them. Every answer shows its work: the SQL that was
 executed, the dataset it ran against, and that dataset's vintage.
 
-**Status:** early scaffold. No data, no model, no UI yet.
+**Status:** local development stack only — nothing deployed. Postgres with a read-only
+agent role, a sqlglot admission guard, a walking skeleton (question → SQL → read-only
+execution) verified against a synthetic `seed-v0` fixture, ingestion contracts with
+quarantine semantics, and pgvector schema retrieval. **No real government data is loaded
+yet**; every row in the database is a stamped fixture.
 
-**Last updated:** 2026-08-25, 23:20 IST
+**Last updated:** 2026-08-26, 00:20 IST
 
 ## Layout
 

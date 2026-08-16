@@ -36,7 +36,7 @@ class CSVLoader(BaseLoader):
         self.encoding = encoding
 
     def fetch_raw(self) -> RawArtifact:
-        return fetch(self.spec.key, self.spec.source_url)
+        return fetch(self.spec.key, self.spec.source_url, verify_tls=self.spec.verify_tls)
 
     def parse(self, raw: RawArtifact) -> pd.DataFrame:
         buf = io.BytesIO(raw.content)

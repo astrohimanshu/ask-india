@@ -36,6 +36,7 @@ class SourceFormat(StrEnum):
     PDF = "pdf"
     HTML = "html"
     JSON = "json"
+    ZIP = "zip"  # several fetched files bundled into one artifact
 
 
 class ColumnSpec(BaseModel):
@@ -71,6 +72,9 @@ class DatasetSpec(BaseModel):
     min_rows: int = 1
     caveats: tuple[str, ...] = ()
     difficulty: str = Field(default="unknown", pattern=r"^(low|medium|high|unknown)$")
+    verify_tls: bool = Field(
+        default=True, description="False only for hosts with a broken certificate chain"
+    )
 
     @property
     def column_names(self) -> tuple[str, ...]:
