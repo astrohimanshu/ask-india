@@ -22,12 +22,13 @@ from askindia_agents.sqlguard import SQLRejectedError, admit
 
 # The retrieval layer replaces this hard-coded dictionary later; the skeleton only needs one table.
 SCHEMA = """
-Table data.dgca_airline_traffic — monthly domestic scheduled airline traffic,
-one row per airline per month.
+Table data.dgca_airline_traffic — monthly airline traffic and operating statistics,
+one row per airline per month per segment.
   period date                       first day of the month (e.g. '2024-03-01' is March 2024)
   airline text                      carrier name
+  segment text                      'scheduled_domestic', 'scheduled_international', ...
+  departures integer                aircraft departures flown in the month
   passengers_carried bigint         passengers flown in that month
-  market_share_pct numeric          share of all domestic passengers that month, 0-100
   passenger_load_factor_pct numeric seats filled, 0-100
   dataset_version text              provenance stamp; rows tagged 'seed-v0' are fixtures
 """

@@ -74,17 +74,22 @@ CREATE TABLE meta.datasets (
     updated_at       timestamptz NOT NULL DEFAULT now()
 );
 
--- DGCA monthly domestic scheduled airline traffic (per airline, per month).
--- dataset_version: 'seed-v0' marks fixture rows that are never real data.
+-- DGCA monthly airline traffic and operating statistics (per airline, per month, per segment).
+-- Same shape the ingestion loader writes; dataset_version 'seed-v0' marks fixture rows.
 CREATE TABLE data.dgca_airline_traffic (
     id                          bigserial PRIMARY KEY,
-    period                      date          NOT NULL,   -- first day of the month
-    airline                     text          NOT NULL,
-    passengers_carried          bigint        NOT NULL CHECK (passengers_carried >= 0),
-    market_share_pct            numeric(5, 2) CHECK (market_share_pct BETWEEN 0 AND 100),
-    passenger_load_factor_pct   numeric(5, 2) CHECK (passenger_load_factor_pct BETWEEN 0 AND 100),
-    dataset_version             text          NOT NULL,
-    UNIQUE (period, airline, dataset_version)
+    period                      date           NOT NULL,   -- first day of the month
+    airline                     text           NOT NULL,
+    segment                     text           NOT NULL,   -- scheduled_domestic, scheduled_international, ...
+    departures                  integer,
+    hours_flown                 numeric(12, 2),
+    km_flown_thousand           numeric(14, 2),
+    passengers_carried          bigint         CHECK (passengers_carried >= 0),
+    passenger_km_thousand       numeric(16, 2),
+    available_seat_km_thousand  numeric(16, 2),
+    passenger_load_factor_pct   numeric(6, 2)  CHECK (passenger_load_factor_pct BETWEEN 0 AND 100),
+    dataset_version             text           NOT NULL,
+    UNIQUE (period, airline, segment, dataset_version)
 );
 CREATE INDEX ON data.dgca_airline_traffic (period);
 CREATE INDEX ON data.dgca_airline_traffic (airline);
