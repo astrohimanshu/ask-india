@@ -16,6 +16,7 @@ from askindia_ingestion.contracts import BaseLoader, DatasetSpec
 MODULES: dict[str, str] = {
     "census_2011_pca": "census",
     "imd_subdivision_rainfall": "rainfall",
+    "fuel_prices_metro": "fuel",
 }
 
 

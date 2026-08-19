@@ -104,7 +104,9 @@ def main() -> int:
         "datasets": rows,
         "survivors": [r["dataset"] for r in rows if r["validate"] == "ok"],
     }
-    Path(args.out).write_text(json.dumps(report, indent=2, default=str))
+    out = Path(args.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(report, indent=2, default=str))
     print(f"\nsurvivors: {report['survivors']}\nwritten {args.out}")
     return 0 if report["survivors"] else 1
 
