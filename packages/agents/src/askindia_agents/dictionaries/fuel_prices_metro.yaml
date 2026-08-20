@@ -1,0 +1,44 @@
+dataset: fuel_prices_metro
+table: data.fuel_prices_metro
+title: Daily retail petrol and diesel prices in Delhi, Mumbai, Chennai and Kolkata since June 2017
+purpose: >-
+  The pump price of petrol and diesel in the four metro cities for every day since daily dynamic
+  pricing began on 16 June 2017, as published by PPAC (Ministry of Petroleum and Natural Gas). Use it
+  for questions about what fuel cost on a date, how much it rose or fell between dates, monthly or
+  yearly averages, and the highest or lowest prices.
+source: Petroleum Planning & Analysis Cell (ppac.gov.in), daily retail selling price of MS (petrol) and HSD (diesel) at metro cities
+cadence: daily rows, file republished roughly monthly
+coverage: 16 June 2017 to the latest published day (August 2026 at last load); 4 cities; petrol and diesel.
+columns:
+  - name: price_date
+    type: date
+    description: Calendar day the price applied (revisions take effect at 6 AM).
+  - name: city
+    type: text
+    description: Metro city.
+    values: [Delhi, Mumbai, Chennai, Kolkata]
+    notes: Only these four cities exist; Bengaluru, Hyderabad and other cities are not covered.
+  - name: fuel
+    type: text
+    description: Fuel type.
+    values: [petrol, diesel]
+    notes: Petrol is also called MS (motor spirit); diesel is HSD.
+  - name: price_inr_per_litre
+    type: numeric
+    description: Retail selling price at Indian Oil outlets, inclusive of excise, VAT and dealer commission.
+    unit: INR per litre
+caveats:
+  - Prices are Indian Oil Corporation prices at the named city; other companies and other cities in the same state differ slightly.
+  - Differences between cities mostly reflect state taxes, not product cost.
+  - No LPG, ATF, CNG or non-metro prices; nothing before 16 June 2017.
+exemplars:
+  - question: What was the petrol price in Delhi on 1 January 2023?
+    sql: SELECT price_inr_per_litre FROM data.fuel_prices_metro WHERE city = 'Delhi' AND fuel = 'petrol' AND price_date = '2023-01-01'
+  - question: What is the latest diesel price in Mumbai?
+    sql: SELECT price_date, price_inr_per_litre FROM data.fuel_prices_metro WHERE city = 'Mumbai' AND fuel = 'diesel' ORDER BY price_date DESC LIMIT 1
+  - question: How much did petrol in Delhi cost on average each year?
+    sql: SELECT EXTRACT(YEAR FROM price_date)::int AS year, ROUND(AVG(price_inr_per_litre), 2) AS avg_price FROM data.fuel_prices_metro WHERE city = 'Delhi' AND fuel = 'petrol' GROUP BY 1 ORDER BY 1
+  - question: When was petrol most expensive in Mumbai and what was the price?
+    sql: SELECT price_date, price_inr_per_litre FROM data.fuel_prices_metro WHERE city = 'Mumbai' AND fuel = 'petrol' ORDER BY price_inr_per_litre DESC, price_date LIMIT 1
+  - question: By how much did the Delhi petrol price change between June 2017 and June 2022?
+    sql: SELECT MAX(CASE WHEN price_date = '2022-06-16' THEN price_inr_per_litre END) - MAX(CASE WHEN price_date = '2017-06-16' THEN price_inr_per_litre END) AS change_inr FROM data.fuel_prices_metro WHERE city = 'Delhi' AND fuel = 'petrol'

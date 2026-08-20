@@ -1,0 +1,50 @@
+dataset: imd_subdivision_rainfall
+table: data.imd_subdivision_rainfall
+title: IMD monthly rainfall by meteorological subdivision, 1901 onwards
+purpose: >-
+  Monthly and annual rainfall in millimetres for each of India's 36 meteorological subdivisions
+  since 1901, with the 1971-2020 long-period normal alongside. Use it for questions about how much
+  rain fell somewhere in a month, season or year, how that compares with normal, droughts, wettest
+  or driest years, and monsoon (June-September) totals.
+source: India Meteorological Department, Pune — Climate Research & Services subdivision rainfall tables
+cadence: monthly (latest year updated through the last published month)
+coverage: 1901 to 2025 for most subdivisions (Arunachal Pradesh from 1916); 36 subdivisions; one row per subdivision, year and month plus an 'Annual' row.
+columns:
+  - name: subdivision
+    type: text
+    description: IMD meteorological subdivision name as published.
+    values: ["Andaman & Nicobar Islands", "Arunachal Pradesh", "Assam and Meghalaya", "Nagaland, Manipur, Mizoram and Tripura", "Sub Himalayan West Bengal & Sikkim", "Gangetic West Bengal", "Odisha", "Jharkhand", "Bihar", "East Uttar Pradesh", "West Uttar Pradesh", "Uttarakhand", "Haryana, Chandigarh and Delhi", "Punjab", "Himachal Pradesh", "Jammu & Kashmir", "West Rajasthan", "East Rajasthan", "West Madhya Pradesh", "East Madhya Pradesh", "Gujarat Region", "Saurashtra and Kutch", "Konkan and Goa", "Madhya Maharashtra", "Marathawada", "Vidarbha", "Chhattisgarh", "Coastal Andhra Pradesh and Yanam", "Telangana", "Rayalaseema", "Tamil Nadu Puducherry and Karaikal", "Coastal Karnataka", "North Interior Karnataka", "South Interior Karnataka", "Kerala and Mahe", "Lakshadweep"]
+    notes: Subdivisions are not states. Kerala is 'Kerala and Mahe'; Delhi is inside 'Haryana, Chandigarh and Delhi'; Mumbai is in 'Konkan and Goa'; Uttar Pradesh, Rajasthan, Madhya Pradesh and Karnataka are split into several subdivisions. Match with ILIKE '%kerala%'.
+  - name: year
+    type: integer
+    description: Calendar year.
+  - name: month
+    type: text
+    description: Three-letter month, or 'Annual' for the January-December total.
+    values: [Jan, Feb, Mar, Apr, May, Jun, Jul, Aug, Sep, Oct, Nov, Dec, Annual]
+    notes: For the southwest monsoon season sum the rows for Jun, Jul, Aug and Sep. Do not sum months together with 'Annual'.
+  - name: rainfall_mm
+    type: numeric
+    description: Actual area-weighted rainfall in that month or year.
+    unit: mm
+  - name: normal_mm
+    type: numeric
+    description: 1971-2020 long-period average for the same subdivision and month (or year).
+    unit: mm
+    notes: Departure from normal (%) = (rainfall_mm - normal_mm) * 100.0 / normal_mm.
+caveats:
+  - Subdivision boundaries differ from state boundaries; answers are about the subdivision, not the state.
+  - Rainfall is an area-weighted average over the subdivision in millimetres, not a station reading.
+  - The latest year may be incomplete or provisional.
+  - Odisha 2023 is published twice by IMD with differing values and is therefore not loaded.
+exemplars:
+  - question: How much rain did Kerala get in the 2018 monsoon (June to September)?
+    sql: SELECT SUM(rainfall_mm) AS monsoon_rain_mm, SUM(normal_mm) AS normal_mm FROM data.imd_subdivision_rainfall WHERE subdivision ILIKE '%kerala%' AND year = 2018 AND month IN ('Jun', 'Jul', 'Aug', 'Sep')
+  - question: Which subdivision received the most rainfall in 2024?
+    sql: SELECT subdivision, rainfall_mm FROM data.imd_subdivision_rainfall WHERE year = 2024 AND month = 'Annual' ORDER BY rainfall_mm DESC LIMIT 1
+  - question: What was the annual rainfall in Vidarbha each year from 2015 to 2024?
+    sql: SELECT year, rainfall_mm, normal_mm FROM data.imd_subdivision_rainfall WHERE subdivision = 'Vidarbha' AND month = 'Annual' AND year BETWEEN 2015 AND 2024 ORDER BY year
+  - question: By what percentage was West Rajasthan's July 2019 rainfall above or below normal?
+    sql: SELECT rainfall_mm, normal_mm, ROUND((rainfall_mm - normal_mm) * 100.0 / normal_mm, 1) AS departure_pct FROM data.imd_subdivision_rainfall WHERE subdivision = 'West Rajasthan' AND year = 2019 AND month = 'Jul'
+  - question: What was the driest year on record for Saurashtra and Kutch?
+    sql: SELECT year, rainfall_mm FROM data.imd_subdivision_rainfall WHERE subdivision = 'Saurashtra and Kutch' AND month = 'Annual' AND rainfall_mm IS NOT NULL ORDER BY rainfall_mm ASC LIMIT 1

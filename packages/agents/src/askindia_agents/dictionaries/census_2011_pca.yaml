@@ -1,0 +1,107 @@
+dataset: census_2011_pca
+table: data.census_2011_pca
+title: Census 2011 Primary Census Abstract — India, states and districts
+purpose: >-
+  Population, households, literates, Scheduled Caste/Tribe population and workers for India,
+  every state/UT and every district as counted in the 2011 Census. Use it for questions about
+  population size, sex ratio, literacy rate, urbanisation and work participation as of 2011.
+source: Office of the Registrar General & Census Commissioner, India (censusindia.gov.in, PCA SD workbook)
+cadence: static (decennial census; 2011 is the latest available)
+coverage: Reference date 1 March 2011. 1 India row, 35 states/UTs, 640 districts; each with Total, Rural and Urban rows.
+columns:
+  - name: state_code
+    type: text
+    description: Two-digit 2011 census state code ('00' = India).
+  - name: district_code
+    type: text
+    description: Three-digit district code within the state ('000' for state and India rows).
+  - name: level
+    type: text
+    description: Geographic level of the row.
+    values: [INDIA, STATE, DISTRICT]
+  - name: name
+    type: text
+    description: Name of India, the state/UT or the district, in upper case as printed by the census (e.g. 'UTTAR PRADESH', 'Bangalore').
+    notes: State names are upper case; district names are title case. Match with ILIKE. 2011 names apply (Bangalore not Bengaluru, Orissa is 'ODISHA').
+  - name: tru
+    type: text
+    description: Whether the row is the whole area, its rural part or its urban part.
+    values: [Total, Rural, Urban]
+    notes: Always filter tru = 'Total' unless the question is about rural or urban population specifically.
+  - name: households
+    type: bigint
+    description: Number of households.
+    unit: households
+  - name: population_total
+    type: bigint
+    description: Total population (persons).
+    unit: persons
+  - name: population_male
+    type: bigint
+    description: Male population.
+    unit: persons
+  - name: population_female
+    type: bigint
+    description: Female population.
+    unit: persons
+    notes: Sex ratio (females per 1000 males) = population_female * 1000.0 / population_male.
+  - name: population_0_6
+    type: bigint
+    description: Children aged 0-6 years.
+    unit: persons
+  - name: literates_total
+    type: bigint
+    description: Literate persons aged 7 and above.
+    unit: persons
+    notes: Literacy rate (%) = literates_total * 100.0 / (population_total - population_0_6).
+  - name: literates_male
+    type: bigint
+    description: Literate males aged 7 and above.
+    unit: persons
+  - name: literates_female
+    type: bigint
+    description: Literate females aged 7 and above.
+    unit: persons
+  - name: sc_population
+    type: bigint
+    description: Scheduled Castes population.
+    unit: persons
+  - name: st_population
+    type: bigint
+    description: Scheduled Tribes population.
+    unit: persons
+  - name: workers_total
+    type: bigint
+    description: Total workers (main plus marginal).
+    unit: persons
+    notes: Work participation rate (%) = workers_total * 100.0 / population_total.
+  - name: workers_main
+    type: bigint
+    description: Main workers (worked 6 months or more in the reference year).
+    unit: persons
+  - name: workers_marginal
+    type: bigint
+    description: Marginal workers (worked less than 6 months).
+    unit: persons
+  - name: non_workers
+    type: bigint
+    description: Non-workers.
+    unit: persons
+caveats:
+  - Figures describe 1 March 2011; there is no later census, so they cannot answer questions about today's population.
+  - Boundaries are as of 2011; Telangana is inside Andhra Pradesh and Ladakh inside Jammu & Kashmir; districts created after 2011 are absent.
+  - Literacy rate must use population aged 7+ (population_total - population_0_6) as the denominator.
+  - Every area appears three times (Total, Rural, Urban); summing across tru double counts.
+exemplars:
+  - question: What was the population of India in 2011?
+    sql: SELECT population_total FROM data.census_2011_pca WHERE level = 'INDIA' AND tru = 'Total'
+  - question: Which are the five most populous states according to Census 2011?
+    sql: SELECT name, population_total FROM data.census_2011_pca WHERE level = 'STATE' AND tru = 'Total' ORDER BY population_total DESC LIMIT 5
+  - question: What is the literacy rate of Kerala and Bihar as per the 2011 census?
+    sql: SELECT name, ROUND(literates_total * 100.0 / (population_total - population_0_6), 2) AS literacy_rate_pct FROM data.census_2011_pca WHERE level = 'STATE' AND tru = 'Total' AND name IN ('KERALA', 'BIHAR')
+  - question: What is the sex ratio of Haryana in 2011?
+    sql: SELECT name, ROUND(population_female * 1000.0 / population_male, 0) AS females_per_1000_males FROM data.census_2011_pca WHERE level = 'STATE' AND tru = 'Total' AND name = 'HARYANA'
+  - question: What share of Maharashtra's population lived in urban areas in 2011?
+    sql: SELECT u.population_total * 100.0 / t.population_total AS urban_share_pct FROM data.census_2011_pca u JOIN data.census_2011_pca t ON t.state_code = u.state_code AND t.district_code = u.district_code AND t.level = u.level AND t.tru = 'Total' WHERE u.level = 'STATE' AND u.tru = 'Urban' AND u.name = 'MAHARASHTRA'
+  - question: Which district has the largest population?
+    sql: SELECT name, population_total FROM data.census_2011_pca WHERE level = 'DISTRICT' AND tru = 'Total' ORDER BY population_total DESC LIMIT 1
