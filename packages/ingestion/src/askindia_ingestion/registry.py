@@ -18,6 +18,7 @@ MODULES: dict[str, str] = {
     "imd_subdivision_rainfall": "rainfall",
     "fuel_prices_metro": "fuel",
     "crop_production": "crops",
+    "dgca_airline_traffic": "dgca",
 }
 
 
