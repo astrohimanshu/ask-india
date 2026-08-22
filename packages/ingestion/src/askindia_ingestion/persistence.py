@@ -46,6 +46,36 @@ def _cell(value: Any) -> Any:
     return value
 
 
+def coverage_bounds(spec: DatasetSpec, frame: pd.DataFrame) -> tuple[str | None, str | None]:
+    """Coverage dates for the catalogue: a static span, or min/max of the dataset's date column."""
+    if spec.coverage_static:
+        return spec.coverage_static[0].isoformat(), spec.coverage_static[1].isoformat()
+    if not len(frame):
+        return None, None
+    candidates = (
+        [spec.coverage_column]
+        if spec.coverage_column
+        else [
+            c.name
+            for c in spec.columns
+            if c.pg_type == "date" or c.name in ("period", "year", "crop_year")
+        ]
+    )
+    for col in candidates:
+        if col not in frame.columns:
+            continue
+        series = frame[col].dropna()
+        if series.empty:
+            continue
+        lo, hi = series.min(), series.max()
+        if col == "year":
+            return f"{int(lo)}-01-01", f"{int(hi)}-12-31"
+        if col == "crop_year":  # '2021-22' is July 2021 to June 2022
+            return f"{int(str(lo)[:4])}-07-01", f"{int(str(hi)[:4]) + 1}-06-30"
+        return str(lo)[:10], str(hi)[:10]
+    return None, None
+
+
 class PostgresPersister:
     """Callable matching :data:`askindia_ingestion.contracts.Persister`, plus audit helpers."""
 
@@ -118,15 +148,7 @@ class PostgresPersister:
     def _upsert_catalogue(
         cur: psycopg.Cursor[Any], spec: DatasetSpec, frame: pd.DataFrame, version: str
     ) -> None:
-        coverage_from = coverage_to = None
-        for col in ("period", "year"):
-            if col in frame.columns and len(frame):
-                lo, hi = frame[col].min(), frame[col].max()
-                if col == "year":
-                    coverage_from, coverage_to = f"{int(lo)}-01-01", f"{int(hi)}-12-31"
-                else:
-                    coverage_from, coverage_to = str(lo)[:10], str(hi)[:10]
-                break
+        coverage_from, coverage_to = coverage_bounds(spec, frame)
         cur.execute(
             """
             INSERT INTO meta.datasets

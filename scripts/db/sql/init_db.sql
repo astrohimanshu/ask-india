@@ -94,4 +94,8 @@ CREATE TABLE data.dgca_airline_traffic (
 CREATE INDEX ON data.dgca_airline_traffic (period);
 CREATE INDEX ON data.dgca_airline_traffic (airline);
 
+-- The catalogue manifest is public information the agent needs for triage and citations.
+GRANT USAGE ON SCHEMA meta TO askindia_ro;
+GRANT SELECT ON meta.datasets TO askindia_ro;
+
 RESET ROLE;

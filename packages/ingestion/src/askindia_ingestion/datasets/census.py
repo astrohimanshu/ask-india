@@ -6,6 +6,7 @@ Source: ORGI NADA catalog 6191 (PCA SD).
 from __future__ import annotations
 
 import io
+from datetime import date
 from pathlib import Path
 
 import pandas as pd
@@ -196,6 +197,7 @@ SPEC = DatasetSpec(
     ),
     difficulty="low",
     verify_tls=False,
+    coverage_static=(date(2011, 3, 1), date(2011, 3, 1)),
 )
 
 

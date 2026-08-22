@@ -12,7 +12,7 @@ import hashlib
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from enum import StrEnum
 from pathlib import Path
 from typing import Any
@@ -74,6 +74,13 @@ class DatasetSpec(BaseModel):
     difficulty: str = Field(default="unknown", pattern=r"^(low|medium|high|unknown)$")
     verify_tls: bool = Field(
         default=True, description="False only for hosts with a broken certificate chain"
+    )
+    coverage_column: str | None = Field(
+        default=None,
+        description="Date-like column whose min/max is the coverage; None = first date column",
+    )
+    coverage_static: tuple[date, date] | None = Field(
+        default=None, description="Fixed coverage for sources without a date column"
     )
 
     @property
