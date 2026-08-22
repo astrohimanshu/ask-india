@@ -19,6 +19,7 @@ MODULES: dict[str, str] = {
     "fuel_prices_metro": "fuel",
     "crop_production": "crops",
     "dgca_airline_traffic": "dgca",
+    "aai_airport_traffic": "aai",
 }
 
 
