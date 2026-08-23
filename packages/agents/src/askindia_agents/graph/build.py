@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import functools
-import os
 from collections.abc import Callable
 from typing import Any, cast
 
 import psycopg
 from langgraph.graph import END, StateGraph
 
+from askindia_agents import tracing
 from askindia_agents.embedder import FastEmbedEmbedder
 from askindia_agents.executor import execute_readonly
 from askindia_agents.graph import nodes
@@ -31,18 +31,17 @@ def _bind(fn: NodeFn, deps: Deps) -> Callable[[AgentState], AgentState]:
     return bound
 
 
+NODE_TYPES = {"retrieve": "retriever", "execute": "tool", "guard": "guardrail"}
+
+
 def _traced(
     fn: Callable[[AgentState], AgentState], name: str
 ) -> Callable[[AgentState], AgentState]:
-    """Wrap a node in a Langfuse span when credentials are configured; otherwise no-op."""
-    if not (os.environ.get("LANGFUSE_PUBLIC_KEY") and os.environ.get("LANGFUSE_SECRET_KEY")):
-        return fn
-    try:
-        from langfuse.decorators import observe
-    except ImportError:  # pragma: no cover
-        return fn
-    wrapped: Callable[[AgentState], AgentState] = observe(name=name)(fn)
-    return wrapped
+    """Wrap a node in a Langfuse observation; a no-op when tracing is not configured."""
+    traced: Callable[[AgentState], AgentState] = tracing.traced_node(
+        name, fn, as_type=NODE_TYPES.get(name, "chain")
+    )
+    return traced
 
 
 def build_graph(deps: Deps) -> Any:
@@ -170,6 +169,12 @@ def real_deps() -> Deps:
 
 
 def run_question(question: str, deps: Deps | None = None) -> FinalAnswer:
+    tracing.configure()
     graph = build_graph(deps or real_deps())
-    state: AgentState = graph.invoke({"question": question})
-    return state["final"]
+    with tracing.observation("ask-india", as_type="agent", input={"question": question}) as trace:
+        state: AgentState = graph.invoke({"question": question})
+        final = state["final"]
+        if trace is not None:
+            trace.update(output={"status": final["status"], "prose": final["prose"]})
+    tracing.flush()
+    return final

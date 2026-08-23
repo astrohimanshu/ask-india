@@ -1,0 +1,71 @@
+dataset: crop_production
+table: data.crop_production
+title: Crop area, production and yield by state (DA&FW five-year estimates)
+purpose: >-
+  Area sown, production and yield for 33 crops and crop groups in every state, by season, for the
+  five most recent crop years published by the Ministry of Agriculture & Farmers Welfare. Use it for
+  questions about how much of a crop a state or India produced, which state grows the most of
+  something, yields, and year-on-year change since 2021-22.
+source: Directorate of Economics & Statistics, DA&FW (desagri.gov.in), Five-Years estimates workbook
+cadence: annual (each release covers five crop years; the latest year is an advance estimate)
+coverage: Crop years 2021-22 to 2025-26; 33 crops; 41 state/UT labels including 'All India'; seasons Kharif, Rabi, Summer, Total.
+columns:
+  - name: crop
+    type: text
+    description: Crop or crop group name as published.
+    values: [Rice, Wheat, Maize, Bajra, Jowar, Ragi, Barley, Small Millets, Gram, Tur, Urad, Moong, Lentil, Other Pulses, Groundnut, Rapeseed & Mustard, Soybean, Sunflower, Sesamum, Castorseed, Linseed, Nigerseed, Safflower, Sugarcane, Cotton, Jute, Mesta, "Jute & Mesta", Total Food Grains, Total Pulses, Total Oil Seeds, Nutri/Coarse Cereals, Shree Anna /Nutri Cereals]
+    notes: Groups (Total Food Grains, Total Pulses, Total Oil Seeds, Nutri/Coarse Cereals) are separate rows; never add crops to groups. Match with ILIKE.
+  - name: state
+    type: text
+    description: State or union territory as published; 'All India' carries the national total.
+    notes: Use state = 'All India' for national figures instead of summing states. Names vary between sheets (e.g. 'J&K' vs 'Jammu And Kashmir'); match with ILIKE. 'Others' groups small states.
+  - name: season
+    type: text
+    description: Growing season, or 'Total' for the whole crop year where a crop has several seasons.
+    values: [Kharif, Rabi, Summer, Total]
+    notes: >-
+      A 'Total' row exists ONLY for crops grown in more than one season (Rice, Maize, Bajra, Jowar,
+      Groundnut, Moong, Urad, Sesamum, Sunflower, Other Pulses, and the groups Total Food Grains,
+      Total Pulses, Total Oil Seeds, Nutri/Coarse Cereals, Shree Anna /Nutri Cereals): for those use
+      season = 'Total' so seasons are not double counted. Single-season crops have no 'Total' row:
+      Wheat, Barley, Gram, Lentil, Linseed, Rapeseed & Mustard, Safflower are Rabi only; Sugarcane,
+      Cotton, Soybean, Tur, Ragi, Small Millets, Castorseed, Nigerseed, Jute, Mesta are Kharif only.
+      For a single-season crop do not filter on season at all. Kharif = monsoon crop, Rabi = winter.
+  - name: crop_year
+    type: text
+    description: Agricultural year, July to June, written like '2023-24'.
+    values: ["2021-22", "2022-23", "2023-24", "2024-25", "2025-26"]
+  - name: estimate_type
+    type: text
+    description: "'final' for settled years or e.g. '3rd advance estimate' for the latest year."
+  - name: area_thousand_ha
+    type: numeric
+    description: Area sown.
+    unit: thousand hectares
+  - name: production_thousand_tonnes
+    type: numeric
+    description: Production. For cotton, jute and mesta the published bales were converted to tonnes using the factor printed on the sheet (170 kg or 180 kg per bale).
+    unit: thousand tonnes
+    notes: 1 million tonnes = 1000 in this column. To quote cotton in bales divide by 0.17 (170 kg bales).
+  - name: yield_kg_per_ha
+    type: numeric
+    description: Yield per hectare.
+    unit: kg per hectare
+caveats:
+  - The latest crop year is an advance estimate and is revised in later releases; earlier years are final estimates.
+  - Only five crop years are covered; questions about earlier years cannot be answered.
+  - Units are thousand hectares, thousand tonnes and kg per hectare exactly as published; cotton/jute/mesta production was converted from bales.
+  - desagri.gov.in serves an incomplete certificate chain; the workbook is fetched without TLS verification and its hash recorded.
+exemplars:
+  - question: How much wheat did India produce in 2023-24?
+    sql: SELECT production_thousand_tonnes, estimate_type FROM data.crop_production WHERE crop = 'Wheat' AND state = 'All India' AND crop_year = '2023-24'
+  - question: Which state produced the most rice in 2022-23?
+    sql: SELECT state, production_thousand_tonnes FROM data.crop_production WHERE crop = 'Rice' AND season = 'Total' AND crop_year = '2022-23' AND state <> 'All India' ORDER BY production_thousand_tonnes DESC LIMIT 1
+  - question: How has India's total food grain production changed from 2021-22 to 2025-26?
+    sql: SELECT crop_year, production_thousand_tonnes, estimate_type FROM data.crop_production WHERE crop = 'Total Food Grains' AND state = 'All India' AND season = 'Total' ORDER BY crop_year
+  - question: What is the wheat yield in Punjab compared with the all-India average in 2023-24?
+    sql: SELECT state, yield_kg_per_ha FROM data.crop_production WHERE crop = 'Wheat' AND crop_year = '2023-24' AND (state ILIKE 'punjab' OR state = 'All India')
+  - question: Top five sugarcane producing states in 2024-25
+    sql: SELECT state, production_thousand_tonnes FROM data.crop_production WHERE crop = 'Sugarcane' AND crop_year = '2024-25' AND state <> 'All India' ORDER BY production_thousand_tonnes DESC LIMIT 5
+  - question: How much maize did Karnataka grow in the kharif season of 2024-25?
+    sql: SELECT production_thousand_tonnes, area_thousand_ha FROM data.crop_production WHERE crop = 'Maize' AND state ILIKE 'karnataka' AND season = 'Kharif' AND crop_year = '2024-25'

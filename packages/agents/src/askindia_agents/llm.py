@@ -15,6 +15,7 @@ from typing import Any, Protocol
 import litellm
 from pydantic import BaseModel, ValidationError
 
+from askindia_agents import tracing
 from askindia_agents.settings import get_settings
 
 litellm.suppress_debug_info = True
@@ -76,16 +77,33 @@ class LiteLLMClient:
         kwargs: dict[str, object] = {}
         if model.startswith("ollama/"):
             kwargs["api_base"] = self.ollama_base_url
-        response = litellm.completion(
+        messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
+        with tracing.observation(
+            (metadata or {}).get("node", "llm"),
+            as_type="generation",
             model=model,
-            messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
-            temperature=temperature,
-            max_tokens=max_tokens,
-            response_format={"type": "json_object"},
-            metadata=metadata or {},
-            **kwargs,
-        )
-        content = response.choices[0].message.content or ""
+            input=messages,
+            metadata=metadata,
+            model_parameters={"temperature": temperature, "max_tokens": max_tokens},
+        ) as gen:
+            response = litellm.completion(
+                model=model,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                response_format={"type": "json_object"},
+                **kwargs,
+            )
+            content = response.choices[0].message.content or ""
+            if gen is not None:
+                usage = getattr(response, "usage", None)
+                gen.update(
+                    output=content,
+                    usage_details={
+                        "input": getattr(usage, "prompt_tokens", 0) or 0,
+                        "output": getattr(usage, "completion_tokens", 0) or 0,
+                    },
+                )
         return parse_contract(content, schema)
 
 

@@ -1,0 +1,44 @@
+dataset: aai_airport_traffic
+table: data.aai_airport_traffic
+title: AAI airport-wise monthly passenger traffic (2023 onwards)
+purpose: >-
+  Passengers handled at each Indian airport every month, split into domestic, international and
+  total, from the Airports Authority of India's monthly traffic annexures. Use it for questions
+  about how busy an airport is, airport rankings, and growth of an airport's traffic.
+source: Airports Authority of India (aai.aero), Traffic News Annexure-III Passengers
+cadence: monthly
+coverage: January 2023 to the latest published month (June 2026 at last load); about 170 airports.
+columns:
+  - name: period
+    type: date
+    description: Month, stored as its first day (e.g. '2025-06-01' is June 2025).
+  - name: airport
+    type: text
+    description: Airport name as published by AAI, title case, sometimes with the operator in brackets.
+    values: ["Delhi (Dial)", "Mumbai (Mial)", "Bengaluru (Bial)", "Hyderabad (Ghial)", Chennai, Kolkata, Kochi, Ahmedabad, Pune, Goa]
+    notes: Names change between months (Delhi vs 'Delhi (Dial)', Bangalore vs Bengaluru, Calicut vs Kozhikode). Always match with ILIKE '%delhi%' rather than equality, and group by period rather than by name when comparing over time.
+  - name: traffic_type
+    type: text
+    description: Which passengers are counted.
+    values: [international, domestic, total]
+    notes: Use traffic_type = 'total' for overall traffic; never add 'total' to the other two.
+  - name: passengers
+    type: bigint
+    description: Passengers handled at the airport in the month (arriving plus departing).
+    unit: passengers
+caveats:
+  - Airport passengers count both arrivals and departures, so a domestic trip is counted at both ends; airport figures are not comparable with airline passengers carried.
+  - Figures are provisional and the latest month is most likely to be revised.
+  - Airport names vary across months; equality matches can miss months.
+  - All-India totals must be computed by summing airports for a period and traffic type.
+exemplars:
+  - question: Which was the busiest airport in India in June 2025?
+    sql: SELECT airport, passengers FROM data.aai_airport_traffic WHERE period = '2025-06-01' AND traffic_type = 'total' ORDER BY passengers DESC LIMIT 1
+  - question: How many international passengers did Mumbai airport handle in 2024?
+    sql: SELECT SUM(passengers) AS passengers FROM data.aai_airport_traffic WHERE airport ILIKE '%mumbai%' AND traffic_type = 'international' AND period BETWEEN '2024-01-01' AND '2024-12-01'
+  - question: Is Bengaluru airport busier than Hyderabad?
+    sql: SELECT CASE WHEN airport ILIKE '%bengaluru%' OR airport ILIKE '%bangalore%' THEN 'Bengaluru' ELSE 'Hyderabad' END AS airport, SUM(passengers) AS passengers FROM data.aai_airport_traffic WHERE traffic_type = 'total' AND period BETWEEN '2025-01-01' AND '2025-12-01' AND (airport ILIKE '%bengaluru%' OR airport ILIKE '%bangalore%' OR airport ILIKE '%hyderabad%') GROUP BY 1 ORDER BY 2 DESC
+  - question: How did Delhi airport's monthly passenger traffic change over 2024?
+    sql: SELECT period, passengers FROM data.aai_airport_traffic WHERE airport ILIKE 'delhi%' AND traffic_type = 'total' AND period BETWEEN '2024-01-01' AND '2024-12-01' ORDER BY period
+  - question: Top ten airports by domestic passengers in March 2025
+    sql: SELECT airport, passengers FROM data.aai_airport_traffic WHERE period = '2025-03-01' AND traffic_type = 'domestic' ORDER BY passengers DESC LIMIT 10

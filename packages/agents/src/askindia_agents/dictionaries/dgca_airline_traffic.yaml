@@ -1,0 +1,73 @@
+dataset: dgca_airline_traffic
+table: data.dgca_airline_traffic
+title: DGCA monthly airline traffic and operating statistics (per airline, 2019 onwards)
+purpose: >-
+  Monthly passengers carried, departures, hours flown, capacity (available seat-km) and passenger
+  load factor for every Indian airline, split by service type (scheduled domestic, scheduled
+  international, non-scheduled). Use it for questions about how many passengers an airline flew,
+  airline rankings and market share, load factors, and growth over months or years.
+source: Directorate General of Civil Aviation (dgca.gov.in), carrier-wise monthly traffic statistics workbooks
+cadence: monthly (current-year workbook refreshed monthly)
+coverage: January 2019 to the latest published month (July 2026 at last load); 24 airlines plus an 'All Airlines' total row.
+columns:
+  - name: period
+    type: date
+    description: Month, stored as its first day (e.g. '2025-01-01' is January 2025).
+    notes: For a calendar year use period BETWEEN '2024-01-01' AND '2024-12-01'.
+  - name: airline
+    type: text
+    description: Airline name as published, title case.
+    values: [Indigo, Air India, Air India Express, Spicejet, Akasa Air, Alliance Air, Vistara, Go Air, Star Air, Fly 91, Flybig, India One Air, Air Asia, Aix Connect, Jet Airways, Trujet, Bluedart, Quikjet Cargo, All Airlines]
+    notes: "'All Airlines' is DGCA's own total row: use it for industry totals and exclude it (airline <> 'All Airlines') when ranking airlines. Market share = airline passengers * 100.0 / 'All Airlines' passengers for the same period and segment. Vistara merged into Air India in Nov 2024; Go Air stopped flying in May 2023; Air Asia became Aix Connect in 2024."
+  - name: segment
+    type: text
+    description: Type of service the row counts.
+    values: [scheduled_domestic, scheduled_international, non_scheduled_domestic, non_scheduled_international]
+    notes: Questions about 'domestic passengers' or airline market share mean segment = 'scheduled_domestic'. Never sum segments unless asked for all services.
+  - name: departures
+    type: integer
+    description: Aircraft departures flown in the month.
+    unit: departures
+  - name: hours_flown
+    type: numeric
+    description: Aircraft hours flown.
+    unit: hours
+  - name: km_flown_thousand
+    type: numeric
+    description: Aircraft kilometres flown.
+    unit: thousand km
+  - name: passengers_carried
+    type: bigint
+    description: Passengers carried in the month.
+    unit: passengers
+    notes: 1 lakh = 100,000; DGCA press reports quote passengers in lakh.
+  - name: passenger_km_thousand
+    type: numeric
+    description: Revenue passenger-kilometres performed.
+    unit: thousand passenger-km
+  - name: available_seat_km_thousand
+    type: numeric
+    description: Available seat-kilometres (capacity offered).
+    unit: thousand seat-km
+  - name: passenger_load_factor_pct
+    type: numeric
+    description: Passenger load factor, seats filled.
+    unit: percent
+caveats:
+  - Figures are DGCA provisional statistics compiled from airline returns; the DGCA monthly PDF traffic reports can differ slightly for the same month.
+  - Cargo carriers (Bluedart, Quikjet Cargo) have departures but no passengers; some months for some carriers are blank.
+  - Seven listed workbooks were unavailable from the DGCA store at load time (Go Air and Vistara 2025-26, TruJet 2024-26); those airline-years are missing, not zero.
+  - The current year is partial and refreshed monthly.
+exemplars:
+  - question: Which airline carried the most domestic passengers in January 2025?
+    sql: SELECT airline, passengers_carried FROM data.dgca_airline_traffic WHERE period = '2025-01-01' AND segment = 'scheduled_domestic' AND airline <> 'All Airlines' ORDER BY passengers_carried DESC NULLS LAST LIMIT 1
+  - question: What was IndiGo's domestic market share in 2024?
+    sql: SELECT ROUND(SUM(a.passengers_carried) * 100.0 / SUM(t.passengers_carried), 2) AS market_share_pct FROM data.dgca_airline_traffic a JOIN data.dgca_airline_traffic t ON t.period = a.period AND t.segment = a.segment AND t.airline = 'All Airlines' WHERE a.airline = 'Indigo' AND a.segment = 'scheduled_domestic' AND a.period BETWEEN '2024-01-01' AND '2024-12-01'
+  - question: How many domestic passengers did Indian airlines carry in total in 2023?
+    sql: SELECT SUM(passengers_carried) AS passengers FROM data.dgca_airline_traffic WHERE airline = 'All Airlines' AND segment = 'scheduled_domestic' AND period BETWEEN '2023-01-01' AND '2023-12-01'
+  - question: How did domestic air traffic change month by month during 2020?
+    sql: SELECT period, passengers_carried FROM data.dgca_airline_traffic WHERE airline = 'All Airlines' AND segment = 'scheduled_domestic' AND period BETWEEN '2020-01-01' AND '2020-12-01' ORDER BY period
+  - question: Which airline had the highest domestic passenger load factor in December 2024?
+    sql: SELECT airline, passenger_load_factor_pct FROM data.dgca_airline_traffic WHERE period = '2024-12-01' AND segment = 'scheduled_domestic' AND airline <> 'All Airlines' AND passenger_load_factor_pct IS NOT NULL ORDER BY passenger_load_factor_pct DESC LIMIT 1
+  - question: How many passengers did Air India carry on international routes in 2025?
+    sql: SELECT SUM(passengers_carried) AS passengers FROM data.dgca_airline_traffic WHERE airline = 'Air India' AND segment = 'scheduled_international' AND period BETWEEN '2025-01-01' AND '2025-12-01'
