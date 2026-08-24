@@ -3,7 +3,15 @@ name = "askindia-api"
 version = "0.1.0"
 description = "FastAPI service exposing the Ask India agent over SSE."
 requires-python = ">=3.12,<3.13"
-dependencies = []
+dependencies = [
+    "askindia-agents",
+    "fastapi>=0.115",
+    "httpx>=0.27",
+    "prometheus-client>=0.20",
+    "slowapi>=0.1.9",
+    "sse-starlette>=2.1",
+    "uvicorn[standard]>=0.30",
+]
 
 [build-system]
 requires = ["hatchling"]
@@ -11,3 +19,6 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/askindia_api"]
+
+[tool.uv.sources]
+askindia-agents = { workspace = true }
