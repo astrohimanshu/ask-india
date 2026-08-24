@@ -37,9 +37,13 @@ def enabled() -> bool:
     return _ENABLED
 
 
+_CONFIGURED = False
+
+
 def _client() -> Any:
     from langfuse import get_client
 
+    configure()
     keys = _keys()
     assert keys is not None
     return get_client(public_key=keys[0])
@@ -47,12 +51,16 @@ def _client() -> Any:
 
 def configure() -> None:
     """Instantiate the client once with explicit credentials (env may hold only the .env values)."""
+    global _CONFIGURED
+    if _CONFIGURED:
+        return
     keys = _keys()
     if keys is None:
         return
     from langfuse import Langfuse
 
     Langfuse(public_key=keys[0], secret_key=keys[1], base_url=keys[2])
+    _CONFIGURED = True
 
 
 @contextlib.contextmanager
