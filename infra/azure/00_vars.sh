@@ -1,5 +1,8 @@
 # Shared names for the Azure scripts. Source this file; every script is idempotent.
-export AZ_LOCATION="${AZ_LOCATION:-centralindia}"
+# Southeast Asia: the subscription policy allows only Malaysia West, East Asia, UAE North, Central
+# India and Southeast Asia, and it permits one Container Apps environment per region; Central India
+# is already taken by an unrelated resource group.
+export AZ_LOCATION="${AZ_LOCATION:-southeastasia}"
 export AZ_RG="${AZ_RG:-rg-askindia}"
 export AZ_ENV="${AZ_ENV:-cae-askindia}"
 export AZ_LOGS="${AZ_LOGS:-log-askindia}"
