@@ -1,0 +1,31 @@
+# Full L1 + L2 run every night on the self-hosted GPU runner; publishes the tables and figures
+# as a downloadable trend artifact.
+name: eval-nightly
+
+on:
+  schedule:
+    - cron: "37 21 * * *"   # 03:07 IST
+  workflow_dispatch:
+
+jobs:
+  full-eval:
+    runs-on: [self-hosted, askindia-gpu]
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - run: ~/.local/bin/uv sync --all-packages --group dev
+      - name: Load environment
+        run: grep -vE '^\s*#|^\s*$' "$HOME/projects/ask-india/.env" >> "$GITHUB_ENV"
+      - name: L1 full
+        run: ~/.local/bin/uv run python -m askindia_evals.l1 --out results/evals/l1 2>&1 | grep -vE '^Fetching|%\|' | tail -40
+      - name: L2 full
+        run: ~/.local/bin/uv run python -m askindia_evals.l2 --out results/evals/l2 2>&1 | grep -vE '^Fetching|%\|' | tail -40
+      - name: Summaries
+        run: cat results/evals/l1/summary_*.txt results/evals/l2/summary_*.txt >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eval-nightly-${{ github.run_id }}
+          path: |
+            results/evals
+            results/figures

@@ -1,0 +1,59 @@
+# Execution-accuracy gate. Runs a stratified subset of the L1 gold set against the live
+# development stack on the self-hosted GPU runner and fails below the threshold, so a change that
+# degrades SQL generation cannot merge. The full set runs nightly (eval-nightly.yml).
+name: eval-gate
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: eval-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  eval-gate:
+    # Only branches of this repository run on the self-hosted runner; forks never do.
+    if: github.event.pull_request.head.repo.full_name == github.repository || github.event_name == 'workflow_dispatch'
+    runs-on: [self-hosted, askindia-gpu]
+    timeout-minutes: 30
+    env:
+      L1_GATE_PCT: ${{ vars.L1_GATE_PCT || '70' }}
+      L1_SUBSET: ${{ vars.L1_SUBSET || '18' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Sync dependencies
+        run: ~/.local/bin/uv sync --all-packages --group dev
+      - name: Load environment
+        run: |
+          # Secrets for the development stack live on the runner host, never in the repository.
+          test -f "$HOME/projects/ask-india/.env" || { echo "missing runner .env"; exit 1; }
+          grep -vE '^\s*#|^\s*$' "$HOME/projects/ask-india/.env" >> "$GITHUB_ENV"
+      - name: Stack is up
+        run: |
+          curl -sf localhost:11434/api/version
+          ~/.local/bin/uv run python -c "import os,psycopg; psycopg.connect(os.environ['DATABASE_URL_RO']).close(); print('db ok')"
+      - name: Run L1 subset
+        id: l1
+        run: |
+          ~/.local/bin/uv run python -m askindia_evals.l1 --subset "$L1_SUBSET" --threshold "$L1_GATE_PCT" --out results/evals/l1-gate \
+            2>&1 | grep -vE '^Fetching|%\|' | tee l1.log
+          acc=$(grep '^ACCURACY' l1.log | awk '{print $2}')
+          echo "accuracy=$acc" >> "$GITHUB_OUTPUT"
+          echo "## L1 execution accuracy (subset of $L1_SUBSET): **${acc}%** (gate ${L1_GATE_PCT}%)" >> "$GITHUB_STEP_SUMMARY"
+          sed -n '/^by dataset/,/^failures/p' l1.log >> "$GITHUB_STEP_SUMMARY"
+      - name: Gate
+        run: |
+          python3 - "$L1_GATE_PCT" "${{ steps.l1.outputs.accuracy }}" <<'PY'
+          import sys
+          gate, acc = float(sys.argv[1]), float(sys.argv[2])
+          print(f"accuracy {acc:.1f}% vs gate {gate:.1f}%")
+          sys.exit(0 if acc >= gate else 1)
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: l1-gate-${{ github.run_id }}
+          path: |
+            results/evals/l1-gate
+            results/figures/l1
