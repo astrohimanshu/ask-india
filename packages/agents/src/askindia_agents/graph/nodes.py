@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import math
+import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date
@@ -32,7 +33,12 @@ log = logging.getLogger(__name__)
 
 class Retriever(Protocol):
     def retrieve(
-        self, question: str, *, top_chunks: int = 12, top_datasets: int = 3
+        self,
+        question: str,
+        *,
+        top_chunks: int = 12,
+        top_datasets: int = 3,
+        only_dataset: str | None = None,
     ) -> RetrievalResult: ...
 
 
@@ -52,37 +58,125 @@ class Deps:
     row_limit: int = 500
 
 
+_WH = re.compile(
+    r"^\s*(who|what|which|when|where|why|how|is|are|was|were|do|does|did|can|could|has|have|"
+    r"compare|list|show|tell|give)\b",
+    re.I,
+)
+_QUANTITY = re.compile(
+    r"\d|\b(lakh|crore|million|billion|percent|per cent|doubled|tripled|halved|more than|"
+    r"less than|higher than|lower than|busier|bigger|larger|smaller)\b",
+    re.I,
+)
+_DATE_EXCUSE = re.compile(
+    r"\b(19|20)\d\d\b|\b(after|up to|until|beyond|future|not (yet )?available|does not cover|"
+    r"coverage)\b",
+    re.I,
+)
+_NO_TOPIC_EXCUSE = re.compile(
+    r"\b(not contain|does not include|no data (related|about|on)|unrelated|no dataset|not related|"
+    r"nothing about|none of the datasets|not covered by any)\b",
+    re.I,
+)
+_TOPIC_STOPWORDS = {
+    "from",
+    "with",
+    "data",
+    "onwards",
+    "monthly",
+    "annual",
+    "static",
+    "seed",
+    "fixture",
+    "statistics",
+    "estimates",
+    "india",
+    "indian",
+    "state",
+    "states",
+    "four",
+    "since",
+    "metros",
+}
+
+
+def looks_like_claim(text: str) -> bool:
+    """A declarative sentence with a quantity or comparison is a claim; a question is not."""
+    t = text.strip()
+    return not t.endswith("?") and not _WH.match(t) and bool(_QUANTITY.search(t))
+
+
+def topic_terms(manifest: str) -> set[str]:
+    words = {w for line in manifest.splitlines() for w in re.findall(r"[a-z]{4,}", line.lower())}
+    return words - _TOPIC_STOPWORDS
+
+
+def mentions_catalogue_topic(text: str, manifest: str) -> bool:
+    words = set(re.findall(r"[a-z]{4,}", text.lower()))
+    return bool(words & topic_terms(manifest))
+
+
 def intake(state: AgentState, deps: Deps) -> AgentState:
-    decision = deps.llm.complete_json(
-        model=deps.chat_model,
-        system=prompts.INTAKE_SYSTEM,
-        user=(
-            f"Today's date: {date.today():%Y-%m-%d}\nMessage: {state['question']}\n\n"
-            f"Catalogue:\n{deps.manifest()}"
-        ),
-        schema=IntakeDecision,
-        metadata={"node": "intake"},
-    )
-    return {
-        "intent": decision.intent,
-        "intake_reason": decision.reason,
-        "attempts": 0,
-        "errors": [],
-    }
+    manifest = deps.manifest()
+    if looks_like_claim(state["question"]):
+        return {
+            "intent": "claim",
+            "intake_reason": "declarative statement with a quantity",
+            "attempts": 0,
+            "errors": [],
+        }
+    try:
+        decision = deps.llm.complete_json(
+            model=deps.chat_model,
+            system=prompts.INTAKE_SYSTEM,
+            user=(
+                f"Today's date: {date.today():%Y-%m-%d}\nMessage: {state['question']}\n\n"
+                f"Catalogue:\n{manifest}"
+            ),
+            schema=IntakeDecision,
+            metadata={"node": "intake"},
+        )
+    except ContractViolationError as e:
+        return {
+            "intent": "out_of_scope",
+            "intake_reason": f"the message could not be classified ({e})",
+            "attempts": 0,
+            "errors": [],
+        }
+    intent, reason = decision.intent, decision.reason
+    if (
+        intent == "out_of_scope"
+        and _DATE_EXCUSE.search(reason)
+        and not _NO_TOPIC_EXCUSE.search(reason)
+    ):
+        # Small models refuse in-coverage dates as "the future"; coverage is settled by the query.
+        intent, reason = "question", "topic is in the catalogue; date coverage decided by the query"
+    return {"intent": intent, "intake_reason": reason, "attempts": 0, "errors": []}
 
 
 def triage(state: AgentState, deps: Deps) -> AgentState:
     """The integrity gate for claims: only a claim one catalogue dataset can settle proceeds."""
-    decision = deps.llm.complete_json(
-        model=deps.chat_model,
-        system=prompts.TRIAGE_SYSTEM,
-        user=(
-            f"Today's date: {date.today():%Y-%m-%d}\nClaim: {state['question']}\n\n"
-            f"Catalogue:\n{deps.manifest()}"
-        ),
-        schema=TriageDecision,
-        metadata={"node": "triage"},
-    )
+    try:
+        decision = deps.llm.complete_json(
+            model=deps.chat_model,
+            system=prompts.TRIAGE_SYSTEM,
+            user=(
+                f"Today's date: {date.today():%Y-%m-%d}\nClaim: {state['question']}\n\n"
+                f"Catalogue:\n{deps.manifest()}"
+            ),
+            schema=TriageDecision,
+            metadata={"node": "triage"},
+        )
+    except ContractViolationError as e:
+        return {
+            "claim": state["question"],
+            "triage": {
+                "triage": "statistical_uncovered",
+                "dataset": None,
+                "reason": f"the claim could not be classified reliably ({e})",
+                "data_needed": "a clearer statement of the claim",
+            },
+        }
     known = {
         line[2:].split(":", 1)[0] for line in deps.manifest().splitlines() if line.startswith("- ")
     }
@@ -100,15 +194,22 @@ def route_after_triage(state: AgentState) -> str:
 
 
 def decompose(state: AgentState, deps: Deps) -> AgentState:
-    decomp = deps.llm.complete_json(
-        model=deps.chat_model,
-        system=prompts.DECOMPOSE_SYSTEM,
-        user=f"Claim: {state['claim']}",
-        schema=Decomposition,
-        metadata={"node": "decompose"},
-    )
+    try:
+        decomp = deps.llm.complete_json(
+            model=deps.chat_model,
+            system=prompts.DECOMPOSE_SYSTEM,
+            user=f"Claim: {state['claim']}",
+            schema=Decomposition,
+            metadata={"node": "decompose"},
+        )
+    except ContractViolationError as e:
+        return {"decomposition": {}, "errors": [*state.get("errors", []), _violation(e)]}
     # The sub-question drives the ordinary query path; the claim text is kept for the verdict.
     return {"decomposition": decomp.model_dump(), "question": decomp.question}
+
+
+def route_after_decompose(state: AgentState) -> str:
+    return "retrieve" if state.get("decomposition") else "fail_closed"
 
 
 def synthesize_verdict(state: AgentState, deps: Deps) -> AgentState:
@@ -135,14 +236,25 @@ def compose_verdict(state: AgentState, deps: Deps) -> AgentState:
     )
     if state.get("regenerated"):
         user += "\n\nYour previous text used numbers not in this material. Use only these numbers."
-    prose = deps.llm.complete_json(
-        model=deps.chat_model,
-        system=prompts.VERDICT_SYSTEM,
-        user=user,
-        schema=VerdictProse,
-        metadata={"node": "compose_verdict"},
-    )
+    try:
+        prose = deps.llm.complete_json(
+            model=deps.chat_model,
+            system=prompts.VERDICT_SYSTEM,
+            user=user,
+            schema=VerdictProse,
+            metadata={"node": "compose_verdict"},
+        )
+    except ContractViolationError as e:
+        return {"composition": {}, "errors": [*state.get("errors", []), _violation(e)]}
     return {"composition": {"prose": prose.prose, "chart": None, "caveats": prose.caveats}}
+
+
+def _violation(e: Exception) -> ErrorRecord:
+    return {"attempt": 0, "kind": "contract_violation", "message": str(e), "sql": None}
+
+
+def route_after_compose(state: AgentState) -> str:
+    return "guard" if state.get("composition") else "fail_closed"
 
 
 def unverifiable(state: AgentState, deps: Deps) -> AgentState:
@@ -185,7 +297,8 @@ def unverifiable(state: AgentState, deps: Deps) -> AgentState:
 
 
 def retrieve(state: AgentState, deps: Deps) -> AgentState:
-    result = deps.retriever.retrieve(state["question"])
+    only = (state.get("triage") or {}).get("dataset") if state.get("claim") else None
+    result = deps.retriever.retrieve(state["question"], only_dataset=only)
     citation = deps.citation_for(result.datasets[0]) if result.datasets else None
     return {"context": result.context_text(), "datasets": result.datasets, "citation": citation}
 
@@ -317,13 +430,16 @@ def compose(state: AgentState, deps: Deps) -> AgentState:
             "\n\nYour previous answer contained numbers that are not in the rows. Rewrite it using "
             "only numbers that appear verbatim in the rows above."
         )
-    composition = deps.llm.complete_json(
-        model=deps.chat_model,
-        system=prompts.COMPOSE_SYSTEM,
-        user=user,
-        schema=Composition,
-        metadata={"node": "compose"},
-    )
+    try:
+        composition = deps.llm.complete_json(
+            model=deps.chat_model,
+            system=prompts.COMPOSE_SYSTEM,
+            user=user,
+            schema=Composition,
+            metadata={"node": "compose"},
+        )
+    except ContractViolationError as e:
+        return {"composition": {}, "errors": [*state.get("errors", []), _violation(e)]}
     chart = composition.chart.model_dump() if composition.chart else None
     if chart and not _chart_columns_exist(chart, state["result"]["columns"]):
         chart = None

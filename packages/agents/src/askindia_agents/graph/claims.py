@@ -8,7 +8,7 @@ import math
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 Verdict = Literal["Supported", "Misleading", "Contradicted", "Unverifiable"]
 TriageClass = Literal["checkable", "statistical_uncovered", "not_statistical"]
@@ -34,6 +34,22 @@ class Decomposition(BaseModel):
         ),
     )
     unit: str = Field(default="", description="unit of claimed_value, e.g. 'lakh passengers', '%'")
+
+    @field_validator("unit", mode="before")
+    @classmethod
+    def _default_unit(cls, v: object) -> object:
+        return "" if v is None else v
+
+    @field_validator("comparison", mode="before")
+    @classmethod
+    def _default_comparison(cls, v: object) -> object:
+        return "value" if v in (None, "") else v
+
+    @field_validator("scale", mode="before")
+    @classmethod
+    def _default_scale(cls, v: object) -> object:
+        return 1.0 if v in (None, "", 0) else v
+
     scale: float = Field(
         default=1.0, description="multiply claimed_value by this to match the data's unit"
     )
@@ -95,6 +111,31 @@ def judge(decomp: Decomposition, rows: list[dict[str, Any]]) -> VerdictResult:
     nums = _numbers(rows[0]) if len(rows) == 1 else [n for r in rows for n in _numbers(r)]
 
     if decomp.comparison in ("greater", "less"):
+        if decomp.claimed_value is not None and len(rows) == 1 and len(nums) >= 1:
+            # Threshold claim: "X was more than N". Compare the computed figure with N.
+            threshold = decomp.claimed_value * (decomp.scale or 1.0)
+            actual = nums[-1]
+            holds = actual > threshold if decomp.comparison == "greater" else actual < threshold
+            margin = abs(actual - threshold) / max(abs(threshold), 1e-9)
+            if holds and margin < 0.02:
+                return VerdictResult(
+                    "Misleading", threshold, actual, margin, "true, but only just (under 2 %)"
+                )
+            if holds:
+                return VerdictResult(
+                    "Supported",
+                    threshold,
+                    actual,
+                    margin,
+                    f"actual {actual:g} is {decomp.comparison} than the claimed {threshold:g}",
+                )
+            return VerdictResult(
+                "Contradicted",
+                threshold,
+                actual,
+                margin,
+                f"actual {actual:g} is not {decomp.comparison} than the claimed {threshold:g}",
+            )
         if len(rows) == 2:
             a, b = (_numbers(rows[0]) or [math.nan])[-1], (_numbers(rows[1]) or [math.nan])[-1]
         elif len(nums) >= 2:

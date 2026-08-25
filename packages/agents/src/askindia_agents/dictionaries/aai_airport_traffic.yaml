@@ -16,7 +16,13 @@ columns:
     type: text
     description: Airport name as published by AAI, title case, sometimes with the operator in brackets.
     values: ["Delhi (Dial)", "Mumbai (Mial)", "Bengaluru (Bial)", "Hyderabad (Ghial)", Chennai, Kolkata, Kochi, Ahmedabad, Pune, Goa]
-    notes: Names change between months (Delhi vs 'Delhi (Dial)', Bangalore vs Bengaluru, Calicut vs Kozhikode). Always match with ILIKE '%delhi%' rather than equality, and group by period rather than by name when comparing over time.
+    notes: >-
+      Names change between months (Delhi vs 'Delhi (Dial)', Bangalore vs Bengaluru, Calicut vs
+      Kozhikode). Always match with ILIKE '%delhi%' rather than equality, and group by period rather
+      than by name when comparing over time. Some cities have two airports: Hyderabad (Ghial) is the
+      main one and Hyderabad (Begumpet) is tiny; Bengaluru (Bial) is the main one and Bengaluru (Hal)
+      is tiny; Delhi (Dial) vs Delhi (Safdarjung). Match the main airport, e.g. ILIKE 'hyderabad (g%'.
+      When combining ILIKE conditions with other filters, parenthesise the OR.
   - name: traffic_type
     type: text
     description: Which passengers are counted.

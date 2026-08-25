@@ -82,8 +82,12 @@ Rules:
   claimed_value 6000000, scale 1)
 - if the claim uses lakh or crore, put the plain number in claimed_value (1 lakh = 100000,
   1 crore = 10000000) and scale 1
-- "greater"/"less": the claim compares two things; the question must ask for both values in the
-  same order as the claim
+- "greater"/"less" with a claimed_value: the claim says a figure exceeds or falls short of a
+  number ("IndiGo carried more than 60% of passengers": claimed_value 60, question asks for the
+  actual share); "greater"/"less" with claimed_value null: the claim compares two things and the
+  question must ask for both values in the same order as the claim, over a whole period (e.g.
+  "total passengers in 2025 at Bengaluru (BIAL) and at Hyderabad (GHIAL)"), never a single month
+  or an ambiguous name
 - "change_pct": the claim says something rose/fell by k percent; claimed_value = k (negative
   for a fall); the question must ask for the percentage change over the same period
 - "ratio": the claim says A is k times B ("doubled" = 2); claimed_value = k; the question must ask

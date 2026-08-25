@@ -37,7 +37,12 @@ ROWS = [{"name": "UTTAR PRADESH", "population_total": 199812341}]
 
 class StubRetriever:
     def retrieve(
-        self, question: str, *, top_chunks: int = 12, top_datasets: int = 3
+        self,
+        question: str,
+        *,
+        top_chunks: int = 12,
+        top_datasets: int = 3,
+        only_dataset: str | None = None,
     ) -> RetrievalResult:
         return RetrievalResult(question=question, chunks=[CHUNK], datasets=["census_2011_pca"])
 

@@ -28,7 +28,12 @@ TABLE_CHUNK = RetrievedChunk(
 
 class StubRetriever:
     def retrieve(
-        self, question: str, *, top_chunks: int = 12, top_datasets: int = 3
+        self,
+        question: str,
+        *,
+        top_chunks: int = 12,
+        top_datasets: int = 3,
+        only_dataset: str | None = None,
     ) -> RetrievalResult:
         return RetrievalResult(
             question=question, chunks=[TABLE_CHUNK], datasets=["census_2011_pca"]
@@ -204,7 +209,13 @@ def test_seed_data_is_flagged_in_caveats() -> None:
 
 
 @pytest.mark.parametrize("bad_reply", [{"intent": "maybe"}, "{}"])
-def test_intake_contract_violation_raises(bad_reply: Any) -> None:
+def test_intake_contract_violation_fails_closed(bad_reply: Any) -> None:
     llm = ScriptedLLM([bad_reply])
-    with pytest.raises(Exception, match=r"violates|not JSON"):
-        build_graph(deps(llm)).invoke({"question": "x"})
+    final = build_graph(deps(llm)).invoke({"question": "tell me something"})["final"]
+    assert final["status"] == "out_of_scope" and "could not be classified" in final["prose"]
+
+
+def test_compose_contract_violation_fails_closed() -> None:
+    llm = ScriptedLLM([INTAKE_Q, GOOD_SQL, "not json at all"])
+    final = build_graph(deps(llm)).invoke({"question": "Most populous state?"})["final"]
+    assert final["status"] == "failed" and final["errors"][-1]["kind"] == "contract_violation"

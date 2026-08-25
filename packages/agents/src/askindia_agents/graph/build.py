@@ -83,7 +83,11 @@ def build_graph(deps: Deps) -> Any:
         nodes.route_after_triage,
         {"decompose": "decompose", "unverifiable": "unverifiable"},
     )
-    g.add_edge("decompose", "retrieve")
+    g.add_conditional_edges(
+        "decompose",
+        nodes.route_after_decompose,
+        {"retrieve": "retrieve", "fail_closed": "fail_closed"},
+    )
     g.add_edge("retrieve", "generate_sql")
     g.add_edge("generate_sql", "execute")
     g.add_conditional_edges(
@@ -97,8 +101,14 @@ def build_graph(deps: Deps) -> Any:
         {"synthesize_verdict": "synthesize_verdict", "compose": "compose"},
     )
     g.add_edge("synthesize_verdict", "compose_verdict")
-    g.add_edge("compose", "guard")
-    g.add_edge("compose_verdict", "guard")
+    g.add_conditional_edges(
+        "compose", nodes.route_after_compose, {"guard": "guard", "fail_closed": "fail_closed"}
+    )
+    g.add_conditional_edges(
+        "compose_verdict",
+        nodes.route_after_compose,
+        {"guard": "guard", "fail_closed": "fail_closed"},
+    )
     g.add_conditional_edges(
         "guard",
         nodes.route_after_guard,

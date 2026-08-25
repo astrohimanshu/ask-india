@@ -87,18 +87,28 @@ class SchemaRetriever:
         self.k_keyword = k_keyword
 
     def retrieve(
-        self, question: str, *, top_chunks: int = 12, top_datasets: int = 3
+        self,
+        question: str,
+        *,
+        top_chunks: int = 12,
+        top_datasets: int = 3,
+        only_dataset: str | None = None,
     ) -> RetrievalResult:
+        """``only_dataset`` restricts both searches to one dataset (used when triage has already
+        decided which dataset settles a claim)."""
         vector = self.embedder.embed([question])[0]
         terms = keyword_terms(question)
+        ds_filter = "" if only_dataset is None else " AND dataset = %(only)s"
         with psycopg.connect(
             self.dsn_ro, application_name="askindia-retriever", row_factory=dict_row
         ) as conn:
             register_vector(conn)
             conn.read_only = True
             vec_rows = conn.execute(
-                "SELECT id FROM rag.chunks ORDER BY embedding <=> %s::vector LIMIT %s",
-                (vector, self.k_vector),
+                "SELECT id FROM rag.chunks WHERE true"
+                + ds_filter
+                + " ORDER BY embedding <=> %(vec)s::vector LIMIT %(k)s",
+                {"vec": vector, "k": self.k_vector, "only": only_dataset},
             ).fetchall()
             kw_rows = conn.execute(
                 """
@@ -108,13 +118,15 @@ class SchemaRetriever:
                                 WHERE title ILIKE '%%' || t || '%%')
                        AS rank
                 FROM rag.chunks
-                WHERE tsv @@ plainto_tsquery('english', %(q)s)
+                WHERE (tsv @@ plainto_tsquery('english', %(q)s)
                    OR EXISTS (SELECT 1 FROM unnest(%(terms)s::text[]) t
-                              WHERE title ILIKE '%%' || t || '%%')
+                              WHERE title ILIKE '%%' || t || '%%'))"""
+                + ds_filter
+                + """
                 ORDER BY rank DESC
                 LIMIT %(k)s
                 """,
-                {"q": question, "terms": terms, "k": self.k_keyword},
+                {"q": question, "terms": terms, "k": self.k_keyword, "only": only_dataset},
             ).fetchall()
             vec_ids = [int(r["id"]) for r in vec_rows]
             kw_ids = [int(r["id"]) for r in kw_rows]
