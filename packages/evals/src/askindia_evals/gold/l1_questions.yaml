@@ -1,0 +1,308 @@
+# Gold set for L1 execution accuracy. Each item: a natural-language question and a hand-written
+# SQL whose result is the gold answer. Scoring compares result rows, not SQL text.
+# complexity: single | filter | rank | group | derived | join
+- id: cen-01
+  dataset: census_2011_pca
+  complexity: single
+  question: What was the total population of India in the 2011 census?
+  sql: SELECT population_total FROM data.census_2011_pca WHERE level = 'INDIA' AND tru = 'Total'
+- id: cen-02
+  dataset: census_2011_pca
+  complexity: filter
+  question: How many people lived in Bihar in 2011?
+  sql: SELECT population_total FROM data.census_2011_pca WHERE level = 'STATE' AND tru = 'Total' AND name = 'BIHAR'
+- id: cen-03
+  dataset: census_2011_pca
+  complexity: rank
+  question: Which are the three most populous states in India as per Census 2011?
+  sql: SELECT name, population_total FROM data.census_2011_pca WHERE level = 'STATE' AND tru = 'Total' ORDER BY population_total DESC LIMIT 3
+- id: cen-04
+  dataset: census_2011_pca
+  complexity: derived
+  question: What was the literacy rate of Kerala in 2011?
+  sql: SELECT ROUND(literates_total * 100.0 / (population_total - population_0_6), 2) AS literacy_rate_pct FROM data.census_2011_pca WHERE level = 'STATE' AND tru = 'Total' AND name = 'KERALA'
+- id: cen-05
+  dataset: census_2011_pca
+  complexity: derived
+  question: What is the sex ratio of Haryana according to the 2011 census?
+  sql: SELECT ROUND(population_female * 1000.0 / population_male, 0) AS females_per_1000_males FROM data.census_2011_pca WHERE level = 'STATE' AND tru = 'Total' AND name = 'HARYANA'
+- id: cen-06
+  dataset: census_2011_pca
+  complexity: rank
+  question: Which district had the largest population in 2011?
+  sql: SELECT name FROM data.census_2011_pca WHERE level = 'DISTRICT' AND tru = 'Total' ORDER BY population_total DESC LIMIT 1
+- id: cen-07
+  dataset: census_2011_pca
+  complexity: filter
+  question: What was the urban population of Maharashtra in 2011?
+  sql: SELECT population_total FROM data.census_2011_pca WHERE level = 'STATE' AND tru = 'Urban' AND name = 'MAHARASHTRA'
+- id: cen-08
+  dataset: census_2011_pca
+  complexity: rank
+  question: Which state had the lowest literacy rate in 2011?
+  sql: SELECT name FROM data.census_2011_pca WHERE level = 'STATE' AND tru = 'Total' ORDER BY literates_total * 1.0 / (population_total - population_0_6) ASC LIMIT 1
+- id: cen-09
+  dataset: census_2011_pca
+  complexity: single
+  question: How many households were there in India in 2011?
+  sql: SELECT households FROM data.census_2011_pca WHERE level = 'INDIA' AND tru = 'Total'
+- id: cen-10
+  dataset: census_2011_pca
+  complexity: derived
+  question: What share of India's population was Scheduled Tribes in 2011?
+  sql: SELECT ROUND(st_population * 100.0 / population_total, 2) AS st_share_pct FROM data.census_2011_pca WHERE level = 'INDIA' AND tru = 'Total'
+
+- id: rain-01
+  dataset: imd_subdivision_rainfall
+  complexity: filter
+  question: What was the annual rainfall in Kerala in 2018?
+  sql: SELECT rainfall_mm FROM data.imd_subdivision_rainfall WHERE subdivision = 'Kerala and Mahe' AND year = 2018 AND month = 'Annual'
+- id: rain-02
+  dataset: imd_subdivision_rainfall
+  complexity: group
+  question: How much rain did Kerala get in the monsoon months June to September of 2018?
+  sql: SELECT SUM(rainfall_mm) AS monsoon_rain_mm FROM data.imd_subdivision_rainfall WHERE subdivision = 'Kerala and Mahe' AND year = 2018 AND month IN ('Jun', 'Jul', 'Aug', 'Sep')
+- id: rain-03
+  dataset: imd_subdivision_rainfall
+  complexity: rank
+  question: Which subdivision received the most rainfall in 2024?
+  sql: SELECT subdivision FROM data.imd_subdivision_rainfall WHERE year = 2024 AND month = 'Annual' ORDER BY rainfall_mm DESC LIMIT 1
+- id: rain-04
+  dataset: imd_subdivision_rainfall
+  complexity: rank
+  question: What was the driest year on record for Saurashtra and Kutch?
+  sql: SELECT year FROM data.imd_subdivision_rainfall WHERE subdivision = 'Saurashtra and Kutch' AND month = 'Annual' AND rainfall_mm IS NOT NULL ORDER BY rainfall_mm ASC LIMIT 1
+- id: rain-05
+  dataset: imd_subdivision_rainfall
+  complexity: derived
+  question: By what percentage was July 2019 rainfall in West Rajasthan above or below normal?
+  sql: SELECT ROUND((rainfall_mm - normal_mm) * 100.0 / normal_mm, 1) AS departure_pct FROM data.imd_subdivision_rainfall WHERE subdivision = 'West Rajasthan' AND year = 2019 AND month = 'Jul'
+- id: rain-06
+  dataset: imd_subdivision_rainfall
+  complexity: group
+  question: What was the annual rainfall in Vidarbha in each year from 2020 to 2024?
+  sql: SELECT year, rainfall_mm FROM data.imd_subdivision_rainfall WHERE subdivision = 'Vidarbha' AND month = 'Annual' AND year BETWEEN 2020 AND 2024 ORDER BY year
+- id: rain-07
+  dataset: imd_subdivision_rainfall
+  complexity: filter
+  question: What is the normal annual rainfall for Tamil Nadu?
+  sql: SELECT DISTINCT normal_mm FROM data.imd_subdivision_rainfall WHERE subdivision = 'Tamil Nadu Puducherry and Karaikal' AND month = 'Annual' AND normal_mm IS NOT NULL
+- id: rain-08
+  dataset: imd_subdivision_rainfall
+  complexity: rank
+  question: Which was the wettest year for Assam and Meghalaya since 2000?
+  sql: SELECT year FROM data.imd_subdivision_rainfall WHERE subdivision = 'Assam and Meghalaya' AND month = 'Annual' AND year >= 2000 ORDER BY rainfall_mm DESC LIMIT 1
+- id: rain-09
+  dataset: imd_subdivision_rainfall
+  complexity: group
+  question: What was the average annual rainfall in Punjab over 2015 to 2024?
+  sql: SELECT ROUND(AVG(rainfall_mm), 1) AS avg_annual_mm FROM data.imd_subdivision_rainfall WHERE subdivision = 'Punjab' AND month = 'Annual' AND year BETWEEN 2015 AND 2024
+- id: rain-10
+  dataset: imd_subdivision_rainfall
+  complexity: filter
+  question: How much rain fell in Marathwada in August 2023?
+  sql: SELECT rainfall_mm FROM data.imd_subdivision_rainfall WHERE subdivision = 'Marathawada' AND year = 2023 AND month = 'Aug'
+
+- id: fuel-01
+  dataset: fuel_prices_metro
+  complexity: filter
+  question: What was the petrol price in Delhi on 1 January 2023?
+  sql: SELECT price_inr_per_litre FROM data.fuel_prices_metro WHERE city = 'Delhi' AND fuel = 'petrol' AND price_date = '2023-01-01'
+- id: fuel-02
+  dataset: fuel_prices_metro
+  complexity: filter
+  question: What was the diesel price in Mumbai on 16 June 2017?
+  sql: SELECT price_inr_per_litre FROM data.fuel_prices_metro WHERE city = 'Mumbai' AND fuel = 'diesel' AND price_date = '2017-06-16'
+- id: fuel-03
+  dataset: fuel_prices_metro
+  complexity: rank
+  question: When was petrol most expensive in Mumbai?
+  sql: SELECT price_date FROM data.fuel_prices_metro WHERE city = 'Mumbai' AND fuel = 'petrol' ORDER BY price_inr_per_litre DESC, price_date LIMIT 1
+- id: fuel-04
+  dataset: fuel_prices_metro
+  complexity: group
+  question: What was the average petrol price in Delhi in each year from 2018 to 2022?
+  sql: SELECT EXTRACT(YEAR FROM price_date)::int AS year, ROUND(AVG(price_inr_per_litre), 2) AS avg_price FROM data.fuel_prices_metro WHERE city = 'Delhi' AND fuel = 'petrol' AND price_date BETWEEN '2018-01-01' AND '2022-12-31' GROUP BY 1 ORDER BY 1
+- id: fuel-05
+  dataset: fuel_prices_metro
+  complexity: derived
+  question: By how many rupees did the Delhi petrol price rise between 16 June 2017 and 16 June 2022?
+  sql: SELECT MAX(CASE WHEN price_date = '2022-06-16' THEN price_inr_per_litre END) - MAX(CASE WHEN price_date = '2017-06-16' THEN price_inr_per_litre END) AS change_inr FROM data.fuel_prices_metro WHERE city = 'Delhi' AND fuel = 'petrol'
+- id: fuel-06
+  dataset: fuel_prices_metro
+  complexity: rank
+  question: Which metro city had the cheapest diesel on 1 March 2024?
+  sql: SELECT city FROM data.fuel_prices_metro WHERE fuel = 'diesel' AND price_date = '2024-03-01' ORDER BY price_inr_per_litre ASC LIMIT 1
+- id: fuel-07
+  dataset: fuel_prices_metro
+  complexity: group
+  question: What was the highest petrol price in each metro city during 2022?
+  sql: SELECT city, MAX(price_inr_per_litre) AS max_price FROM data.fuel_prices_metro WHERE fuel = 'petrol' AND price_date BETWEEN '2022-01-01' AND '2022-12-31' GROUP BY city ORDER BY city
+- id: fuel-08
+  dataset: fuel_prices_metro
+  complexity: filter
+  question: What is the latest available diesel price in Kolkata?
+  sql: SELECT price_inr_per_litre FROM data.fuel_prices_metro WHERE city = 'Kolkata' AND fuel = 'diesel' ORDER BY price_date DESC LIMIT 1
+- id: fuel-09
+  dataset: fuel_prices_metro
+  complexity: derived
+  question: How much more expensive was petrol than diesel in Chennai on 1 October 2021?
+  sql: SELECT MAX(CASE WHEN fuel = 'petrol' THEN price_inr_per_litre END) - MAX(CASE WHEN fuel = 'diesel' THEN price_inr_per_litre END) AS gap_inr FROM data.fuel_prices_metro WHERE city = 'Chennai' AND price_date = '2021-10-01'
+- id: fuel-10
+  dataset: fuel_prices_metro
+  complexity: group
+  question: On how many days in 2020 did diesel cost more than petrol in Delhi?
+  sql: SELECT COUNT(*) AS days FROM data.fuel_prices_metro p JOIN data.fuel_prices_metro d ON d.price_date = p.price_date AND d.city = p.city AND d.fuel = 'diesel' WHERE p.city = 'Delhi' AND p.fuel = 'petrol' AND p.price_date BETWEEN '2020-01-01' AND '2020-12-31' AND d.price_inr_per_litre > p.price_inr_per_litre
+
+- id: crop-01
+  dataset: crop_production
+  complexity: filter
+  question: How much wheat did India produce in 2023-24?
+  sql: SELECT production_thousand_tonnes FROM data.crop_production WHERE crop = 'Wheat' AND state = 'All India' AND crop_year = '2023-24'
+- id: crop-02
+  dataset: crop_production
+  complexity: rank
+  question: Which state produced the most rice in 2022-23?
+  sql: SELECT state FROM data.crop_production WHERE crop = 'Rice' AND season = 'Total' AND crop_year = '2022-23' AND state <> 'All India' ORDER BY production_thousand_tonnes DESC LIMIT 1
+- id: crop-03
+  dataset: crop_production
+  complexity: group
+  question: How did India's total food grain production change year by year from 2021-22 to 2024-25?
+  sql: SELECT crop_year, production_thousand_tonnes FROM data.crop_production WHERE crop = 'Total Food Grains' AND state = 'All India' AND season = 'Total' AND crop_year <= '2024-25' ORDER BY crop_year
+- id: crop-04
+  dataset: crop_production
+  complexity: filter
+  question: What was the wheat yield in Punjab in 2023-24?
+  sql: SELECT yield_kg_per_ha FROM data.crop_production WHERE crop = 'Wheat' AND state = 'Punjab' AND crop_year = '2023-24'
+- id: crop-05
+  dataset: crop_production
+  complexity: rank
+  question: Which were the top three sugarcane producing states in 2024-25?
+  sql: SELECT state FROM data.crop_production WHERE crop = 'Sugarcane' AND crop_year = '2024-25' AND state <> 'All India' ORDER BY production_thousand_tonnes DESC LIMIT 3
+- id: crop-06
+  dataset: crop_production
+  complexity: filter
+  question: What was the area under cotton in Gujarat in 2022-23?
+  sql: SELECT area_thousand_ha FROM data.crop_production WHERE crop = 'Cotton' AND state = 'Gujarat' AND crop_year = '2022-23'
+- id: crop-07
+  dataset: crop_production
+  complexity: filter
+  question: How much maize did Karnataka produce in the kharif season of 2024-25?
+  sql: SELECT production_thousand_tonnes FROM data.crop_production WHERE crop = 'Maize' AND state = 'Karnataka' AND season = 'Kharif' AND crop_year = '2024-25'
+- id: crop-08
+  dataset: crop_production
+  complexity: derived
+  question: By what percentage did India's wheat production change from 2021-22 to 2024-25?
+  sql: SELECT ROUND((MAX(CASE WHEN crop_year = '2024-25' THEN production_thousand_tonnes END) - MAX(CASE WHEN crop_year = '2021-22' THEN production_thousand_tonnes END)) * 100.0 / MAX(CASE WHEN crop_year = '2021-22' THEN production_thousand_tonnes END), 2) AS change_pct FROM data.crop_production WHERE crop = 'Wheat' AND state = 'All India'
+- id: crop-09
+  dataset: crop_production
+  complexity: rank
+  question: Which state had the highest rice yield in 2023-24?
+  sql: SELECT state FROM data.crop_production WHERE crop = 'Rice' AND season = 'Total' AND crop_year = '2023-24' AND state <> 'All India' AND yield_kg_per_ha IS NOT NULL ORDER BY yield_kg_per_ha DESC LIMIT 1
+- id: crop-10
+  dataset: crop_production
+  complexity: filter
+  question: How much total pulses did India produce in 2024-25?
+  sql: SELECT production_thousand_tonnes FROM data.crop_production WHERE crop = 'Total Pulses' AND state = 'All India' AND season = 'Total' AND crop_year = '2024-25'
+
+- id: dgca-01
+  dataset: dgca_airline_traffic
+  complexity: rank
+  question: Which airline carried the most domestic passengers in January 2025?
+  sql: SELECT airline FROM data.dgca_airline_traffic WHERE period = '2025-01-01' AND segment = 'scheduled_domestic' AND airline <> 'All Airlines' ORDER BY passengers_carried DESC NULLS LAST LIMIT 1
+- id: dgca-02
+  dataset: dgca_airline_traffic
+  complexity: filter
+  question: How many domestic passengers did IndiGo carry in January 2025?
+  sql: SELECT passengers_carried FROM data.dgca_airline_traffic WHERE period = '2025-01-01' AND segment = 'scheduled_domestic' AND airline = 'Indigo'
+- id: dgca-03
+  dataset: dgca_airline_traffic
+  complexity: group
+  question: How many domestic passengers did all Indian airlines carry in total in 2023?
+  sql: SELECT SUM(passengers_carried) AS passengers FROM data.dgca_airline_traffic WHERE airline = 'All Airlines' AND segment = 'scheduled_domestic' AND period BETWEEN '2023-01-01' AND '2023-12-01'
+- id: dgca-04
+  dataset: dgca_airline_traffic
+  complexity: join
+  question: What was IndiGo's share of domestic passengers in calendar year 2024?
+  sql: SELECT ROUND(SUM(a.passengers_carried) * 100.0 / SUM(t.passengers_carried), 2) AS market_share_pct FROM data.dgca_airline_traffic a JOIN data.dgca_airline_traffic t ON t.period = a.period AND t.segment = a.segment AND t.airline = 'All Airlines' WHERE a.airline = 'Indigo' AND a.segment = 'scheduled_domestic' AND a.period BETWEEN '2024-01-01' AND '2024-12-01'
+- id: dgca-05
+  dataset: dgca_airline_traffic
+  complexity: group
+  question: What was the month-by-month domestic passenger total for all airlines in 2020?
+  sql: SELECT period, passengers_carried FROM data.dgca_airline_traffic WHERE airline = 'All Airlines' AND segment = 'scheduled_domestic' AND period BETWEEN '2020-01-01' AND '2020-12-01' ORDER BY period
+- id: dgca-06
+  dataset: dgca_airline_traffic
+  complexity: rank
+  question: Which airline had the highest domestic passenger load factor in December 2024?
+  sql: SELECT airline FROM data.dgca_airline_traffic WHERE period = '2024-12-01' AND segment = 'scheduled_domestic' AND airline <> 'All Airlines' AND passenger_load_factor_pct IS NOT NULL ORDER BY passenger_load_factor_pct DESC LIMIT 1
+- id: dgca-07
+  dataset: dgca_airline_traffic
+  complexity: group
+  question: How many passengers did Air India carry on scheduled international services in 2025?
+  sql: SELECT SUM(passengers_carried) AS passengers FROM data.dgca_airline_traffic WHERE airline = 'Air India' AND segment = 'scheduled_international' AND period BETWEEN '2025-01-01' AND '2025-12-01'
+- id: dgca-08
+  dataset: dgca_airline_traffic
+  complexity: filter
+  question: How many departures did SpiceJet operate on domestic scheduled services in March 2023?
+  sql: SELECT departures FROM data.dgca_airline_traffic WHERE period = '2023-03-01' AND segment = 'scheduled_domestic' AND airline = 'Spicejet'
+- id: dgca-09
+  dataset: dgca_airline_traffic
+  complexity: derived
+  question: By what percentage did total domestic passengers change from 2019 to 2023?
+  sql: SELECT ROUND((SUM(CASE WHEN period BETWEEN '2023-01-01' AND '2023-12-01' THEN passengers_carried END) - SUM(CASE WHEN period BETWEEN '2019-01-01' AND '2019-12-01' THEN passengers_carried END)) * 100.0 / SUM(CASE WHEN period BETWEEN '2019-01-01' AND '2019-12-01' THEN passengers_carried END), 2) AS change_pct FROM data.dgca_airline_traffic WHERE airline = 'All Airlines' AND segment = 'scheduled_domestic'
+- id: dgca-10
+  dataset: dgca_airline_traffic
+  complexity: rank
+  question: Which three airlines carried the most domestic passengers in 2024?
+  sql: SELECT airline FROM data.dgca_airline_traffic WHERE segment = 'scheduled_domestic' AND airline <> 'All Airlines' AND period BETWEEN '2024-01-01' AND '2024-12-01' GROUP BY airline ORDER BY SUM(passengers_carried) DESC NULLS LAST LIMIT 3
+
+- id: aai-01
+  dataset: aai_airport_traffic
+  complexity: rank
+  question: Which was the busiest airport in India in June 2025?
+  sql: SELECT airport FROM data.aai_airport_traffic WHERE period = '2025-06-01' AND traffic_type = 'total' ORDER BY passengers DESC LIMIT 1
+- id: aai-02
+  dataset: aai_airport_traffic
+  complexity: filter
+  question: How many passengers did Delhi airport handle in June 2025?
+  sql: SELECT passengers FROM data.aai_airport_traffic WHERE period = '2025-06-01' AND traffic_type = 'total' AND airport ILIKE 'delhi%'
+- id: aai-03
+  dataset: aai_airport_traffic
+  complexity: group
+  question: How many international passengers did Mumbai airport handle in 2024?
+  sql: SELECT SUM(passengers) AS passengers FROM data.aai_airport_traffic WHERE airport ILIKE 'mumbai%' AND traffic_type = 'international' AND period BETWEEN '2024-01-01' AND '2024-12-01'
+- id: aai-04
+  dataset: aai_airport_traffic
+  complexity: rank
+  question: Which five airports handled the most domestic passengers in March 2025?
+  sql: SELECT airport FROM data.aai_airport_traffic WHERE period = '2025-03-01' AND traffic_type = 'domestic' ORDER BY passengers DESC LIMIT 5
+- id: aai-05
+  dataset: aai_airport_traffic
+  complexity: group
+  question: What was Chennai airport's total passenger traffic in each month of 2024?
+  sql: SELECT period, passengers FROM data.aai_airport_traffic WHERE airport ILIKE 'chennai%' AND traffic_type = 'total' AND period BETWEEN '2024-01-01' AND '2024-12-01' ORDER BY period
+- id: aai-06
+  dataset: aai_airport_traffic
+  complexity: derived
+  question: Did Bengaluru or Hyderabad airport handle more passengers in total during 2025?
+  sql: SELECT CASE WHEN airport ILIKE 'bengaluru%' OR airport ILIKE 'bangalore%' THEN 'Bengaluru' ELSE 'Hyderabad' END AS city FROM data.aai_airport_traffic WHERE traffic_type = 'total' AND period BETWEEN '2025-01-01' AND '2025-12-01' AND (airport ILIKE 'bengaluru (bial)' OR airport ILIKE 'bangalore (bial)' OR airport ILIKE 'hyderabad (ghial)') GROUP BY 1 ORDER BY SUM(passengers) DESC LIMIT 1
+- id: aai-07
+  dataset: aai_airport_traffic
+  complexity: group
+  question: How many passengers in total did all Indian airports handle in June 2025?
+  sql: SELECT SUM(passengers) AS passengers FROM data.aai_airport_traffic WHERE period = '2025-06-01' AND traffic_type = 'total'
+- id: aai-08
+  dataset: aai_airport_traffic
+  complexity: filter
+  question: How many domestic passengers did Kolkata airport handle in January 2024?
+  sql: SELECT passengers FROM data.aai_airport_traffic WHERE period = '2024-01-01' AND traffic_type = 'domestic' AND airport ILIKE 'kolkata%'
+- id: aai-09
+  dataset: aai_airport_traffic
+  complexity: derived
+  question: By what percentage did Delhi airport's total passengers change between June 2024 and June 2025?
+  sql: SELECT ROUND((MAX(CASE WHEN period = '2025-06-01' THEN passengers END) - MAX(CASE WHEN period = '2024-06-01' THEN passengers END)) * 100.0 / MAX(CASE WHEN period = '2024-06-01' THEN passengers END), 2) AS change_pct FROM data.aai_airport_traffic WHERE airport ILIKE 'delhi%' AND traffic_type = 'total'
+- id: aai-10
+  dataset: aai_airport_traffic
+  complexity: rank
+  question: Which airport had the most international passengers in December 2024?
+  sql: SELECT airport FROM data.aai_airport_traffic WHERE period = '2024-12-01' AND traffic_type = 'international' ORDER BY passengers DESC LIMIT 1
