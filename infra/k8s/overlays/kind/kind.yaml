@@ -1,0 +1,10 @@
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: askindia
+nodes:
+  - role: control-plane
+    extraPortMappings:
+      - containerPort: 30800
+        hostPort: 30800
+      - containerPort: 30300
+        hostPort: 30300

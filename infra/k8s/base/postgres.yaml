@@ -1,0 +1,86 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: db-init
+data:
+  # The init SQL is mounted from scripts/db by the overlay (configMapGenerator); this map only
+  # carries the shell entrypoint that runs it with the role passwords from the secret.
+  01_init_db.sh: |
+    #!/usr/bin/env bash
+    set -euo pipefail
+    psql -v ON_ERROR_STOP=1 -v app_pw="${ASKINDIA_APP_PASSWORD}" -v ro_pw="${ASKINDIA_RO_PASSWORD}" \
+      --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" -f /docker-entrypoint-initdb.d/sql/init_db.sql
+    psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" -f /docker-entrypoint-initdb.d/sql/seed.sql
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: db
+spec:
+  selector:
+    app: db
+  ports:
+    - port: 5432
+      targetPort: 5432
+  clusterIP: None
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: db
+spec:
+  serviceName: db
+  replicas: 1
+  selector:
+    matchLabels:
+      app: db
+  template:
+    metadata:
+      labels:
+        app: db
+    spec:
+      securityContext:
+        fsGroup: 999
+      containers:
+        - name: postgres
+          image: pgvector/pgvector:pg16
+          args: ["-c", "shared_buffers=256MB"]
+          envFrom:
+            - secretRef:
+                name: askindia-secrets
+          env:
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          ports:
+            - containerPort: 5432
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+            - name: init-sh
+              mountPath: /docker-entrypoint-initdb.d/01_init_db.sh
+              subPath: 01_init_db.sh
+            - name: init-sql
+              mountPath: /docker-entrypoint-initdb.d/sql
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres", "-d", "askindia"]
+            periodSeconds: 5
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { memory: 1Gi }
+      volumes:
+        - name: init-sh
+          configMap:
+            name: db-init
+            defaultMode: 0755
+        - name: init-sql
+          configMap:
+            name: db-init-sql
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 2Gi
