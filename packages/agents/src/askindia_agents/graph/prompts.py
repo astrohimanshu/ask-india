@@ -57,3 +57,44 @@ query. Rules:
 Reply with JSON only:
 {"prose": "...", "caveats": ["..."],
  "chart": {"type": "bar|line|table", "x": "col", "y": ["col"], "title": "..."} or null}"""
+
+
+TRIAGE_SYSTEM = """You decide whether a statistical claim about India can be checked against the
+datasets in the catalogue that follows it. This is an integrity gate: when in doubt, the claim is
+NOT checkable. Reply with JSON {"triage": ..., "dataset": ..., "reason": ..., "data_needed": ...}.
+triage must be one of:
+- "checkable": the claim's figure can be computed from exactly one catalogue dataset AND the
+  period it refers to is inside that dataset's coverage; set "dataset" to that dataset key
+- "statistical_uncovered": it is a statistical claim, but no catalogue dataset (or coverage
+  period) can settle it; say in "data_needed" which official dataset would be needed
+- "not_statistical": an opinion, prediction, or a claim without a checkable quantity
+Examples: "IndiGo carried 60% of domestic passengers in 2024" -> checkable (dgca_airline_traffic).
+"India's GDP grew 8% last year" -> statistical_uncovered (needs MoSPI national accounts).
+"Delhi is the best city" -> not_statistical."""
+
+DECOMPOSE_SYSTEM = """You turn a statistical claim into ONE plain question whose numeric answer
+settles it, and you extract the claimed number. Reply with JSON:
+{"question": "...", "claimed_value": number or null,
+ "comparison": "value|greater|less|ratio|change_pct", "unit": "...", "scale": number}
+Rules:
+- "value": the claim states a figure (e.g. "Delhi handled 6 million passengers in June 2025"
+  -> question "How many passengers did Delhi airport handle in June 2025?",
+  claimed_value 6000000, scale 1)
+- if the claim uses lakh or crore, put the plain number in claimed_value (1 lakh = 100000,
+  1 crore = 10000000) and scale 1
+- "greater"/"less": the claim compares two things; the question must ask for both values in the
+  same order as the claim
+- "change_pct": the claim says something rose/fell by k percent; claimed_value = k (negative
+  for a fall); the question must ask for the percentage change over the same period
+- "ratio": the claim says A is k times B ("doubled" = 2); claimed_value = k; the question must ask
+  for the ratio A/B
+- keep the question specific: same place, same period, same measure as the claim"""
+
+VERDICT_SYSTEM = """You write a short, neutral verdict explanation for a fact-check. You are given
+the claim, the verdict decided by arithmetic, the claimed and actual figures, the rows the figure
+came from, and the dataset. Rules:
+- state the verdict and the claimed vs actual figures using ONLY numbers that appear in
+  the material you are given (rounding to 2 decimals is allowed); never add other numbers
+- name the dataset and its coverage or vintage; mention one caveat if relevant
+- do not speculate about why the claim was made or who made it
+Reply with JSON only: {"prose": "...", "caveats": ["..."]}"""

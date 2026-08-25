@@ -31,7 +31,12 @@ def _bind(fn: NodeFn, deps: Deps) -> Callable[[AgentState], AgentState]:
     return bound
 
 
-NODE_TYPES = {"retrieve": "retriever", "execute": "tool", "guard": "guardrail"}
+NODE_TYPES = {
+    "retrieve": "retriever",
+    "execute": "tool",
+    "guard": "guardrail",
+    "triage": "guardrail",
+}
 
 
 def _traced(
@@ -48,6 +53,11 @@ def build_graph(deps: Deps) -> Any:
     g = StateGraph(AgentState)
     for name, fn in (
         ("intake", nodes.intake),
+        ("triage", nodes.triage),
+        ("decompose", nodes.decompose),
+        ("unverifiable", nodes.unverifiable),
+        ("synthesize_verdict", nodes.synthesize_verdict),
+        ("compose_verdict", nodes.compose_verdict),
         ("retrieve", nodes.retrieve),
         ("generate_sql", nodes.generate_sql),
         ("execute", nodes.execute),
@@ -63,9 +73,17 @@ def build_graph(deps: Deps) -> Any:
     g.set_entry_point("intake")
     g.add_conditional_edges(
         "intake",
-        lambda s: "out_of_scope" if s.get("intent") == "out_of_scope" else "retrieve",
-        {"out_of_scope": "out_of_scope", "retrieve": "retrieve"},
+        lambda s: {"out_of_scope": "out_of_scope", "claim": "triage"}.get(
+            s.get("intent", ""), "retrieve"
+        ),
+        {"out_of_scope": "out_of_scope", "triage": "triage", "retrieve": "retrieve"},
     )
+    g.add_conditional_edges(
+        "triage",
+        nodes.route_after_triage,
+        {"decompose": "decompose", "unverifiable": "unverifiable"},
+    )
+    g.add_edge("decompose", "retrieve")
     g.add_edge("retrieve", "generate_sql")
     g.add_edge("generate_sql", "execute")
     g.add_conditional_edges(
@@ -73,15 +91,26 @@ def build_graph(deps: Deps) -> Any:
         nodes.route_after_execute,
         {"validate": "validate", "generate_sql": "generate_sql", "fail_closed": "fail_closed"},
     )
-    g.add_edge("validate", "compose")
+    g.add_conditional_edges(
+        "validate",
+        nodes.route_after_validate,
+        {"synthesize_verdict": "synthesize_verdict", "compose": "compose"},
+    )
+    g.add_edge("synthesize_verdict", "compose_verdict")
     g.add_edge("compose", "guard")
+    g.add_edge("compose_verdict", "guard")
     g.add_conditional_edges(
         "guard",
         nodes.route_after_guard,
         {"finish": "finish", "regenerate": "mark_regenerated", "fail_closed": "fail_closed"},
     )
-    g.add_edge("mark_regenerated", "compose")
+    g.add_conditional_edges(
+        "mark_regenerated",
+        nodes.route_after_regenerate,
+        {"compose_verdict": "compose_verdict", "compose": "compose"},
+    )
     g.add_edge("finish", END)
+    g.add_edge("unverifiable", END)
     g.add_edge("out_of_scope", END)
     g.add_edge("fail_closed", END)
     return g.compile()

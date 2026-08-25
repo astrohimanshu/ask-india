@@ -51,7 +51,10 @@ class ErrorRecord(TypedDict):
 
 
 class FinalAnswer(TypedDict, total=False):
-    status: Literal["answered", "out_of_scope", "failed"]
+    status: Literal["answered", "out_of_scope", "failed", "verdict", "unverifiable"]
+    mode: Literal["question", "claim"]
+    claim: str | None
+    verdict: dict[str, Any] | None
     prose: str
     chart: dict[str, Any] | None
     sql: str | None
@@ -68,6 +71,10 @@ class FinalAnswer(TypedDict, total=False):
 
 class AgentState(TypedDict, total=False):
     question: str
+    claim: str
+    triage: dict[str, Any]
+    decomposition: dict[str, Any]
+    verdict: dict[str, Any]
     intent: Intent
     intake_reason: str
     context: str

@@ -18,8 +18,20 @@ export type Citation = {
   coverage: string | null;
 };
 
+export type Verdict = {
+  verdict: "Supported" | "Misleading" | "Contradicted" | "Unverifiable";
+  claimed: number | null;
+  actual: number | null;
+  relative_error: number | null;
+  explanation: string;
+  tolerance: { supported_within: number; misleading_factor: number } | null;
+};
+
 export type Answer = {
-  status: "answered" | "out_of_scope" | "failed";
+  status: "answered" | "out_of_scope" | "failed" | "verdict" | "unverifiable";
+  mode: "question" | "claim";
+  claim: string | null;
+  verdict: Verdict | null;
   prose: string;
   chart: ChartSpec | null;
   sql: string | null;

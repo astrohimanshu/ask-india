@@ -19,8 +19,20 @@ class CitationOut(BaseModel):
     coverage: str | None = None
 
 
+class VerdictOut(BaseModel):
+    verdict: Literal["Supported", "Misleading", "Contradicted", "Unverifiable"]
+    claimed: float | None = None
+    actual: float | None = None
+    relative_error: float | None = None
+    explanation: str = ""
+    tolerance: dict[str, float] | None = None
+
+
 class AnswerOut(BaseModel):
-    status: Literal["answered", "out_of_scope", "failed"]
+    status: Literal["answered", "out_of_scope", "failed", "verdict", "unverifiable"]
+    mode: Literal["question", "claim"] = "question"
+    claim: str | None = None
+    verdict: VerdictOut | None = None
     prose: str
     chart: dict[str, Any] | None = None
     sql: str | None = None

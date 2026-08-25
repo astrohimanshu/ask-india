@@ -8,7 +8,48 @@ const STATUS: Record<Answer["status"], { label: string; className: string }> = {
   answered: { label: "Grounded answer", className: "bg-emerald-600/10 text-emerald-800 dark:text-emerald-300" },
   out_of_scope: { label: "Outside the catalogue", className: "bg-amber-500/15 text-amber-800 dark:text-amber-300" },
   failed: { label: "Could not answer", className: "bg-red-600/10 text-red-800 dark:text-red-300" },
+  verdict: { label: "Claim checked", className: "bg-sky-600/10 text-sky-800 dark:text-sky-300" },
+  unverifiable: { label: "Claim not checkable", className: "bg-amber-500/15 text-amber-800 dark:text-amber-300" },
 };
+
+const VERDICT_STYLE: Record<NonNullable<Answer["verdict"]>["verdict"], string> = {
+  Supported: "bg-emerald-600 text-white",
+  Misleading: "bg-amber-500 text-white",
+  Contradicted: "bg-red-600 text-white",
+  Unverifiable: "bg-zinc-500 text-white",
+};
+
+function num(v: number | null): string {
+  return v === null ? "—" : Intl.NumberFormat("en-IN", { maximumFractionDigits: 2 }).format(v);
+}
+
+function VerdictPanel({ answer }: { answer: Answer }) {
+  const v = answer.verdict;
+  if (!v) return null;
+  const hasFigures = v.claimed !== null || v.actual !== null;
+  return (
+    <div className="mb-4 rounded-lg border border-border/70 bg-muted/30 p-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <span className={`rounded-md px-2.5 py-1 font-display text-lg font-semibold ${VERDICT_STYLE[v.verdict]}`}>{v.verdict}</span>
+        {answer.claim ? <span className="text-sm text-muted-foreground">“{answer.claim}”</span> : null}
+      </div>
+      {hasFigures ? (
+        <dl className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <div><dt className="text-xs uppercase tracking-wide text-muted-foreground">Claimed</dt><dd className="font-mono text-lg tabular-nums">{num(v.claimed)}</dd></div>
+          <div><dt className="text-xs uppercase tracking-wide text-muted-foreground">In the data</dt><dd className="font-mono text-lg tabular-nums">{num(v.actual)}</dd></div>
+          {v.relative_error !== null && Number.isFinite(v.relative_error) ? (
+            <div><dt className="text-xs uppercase tracking-wide text-muted-foreground">Difference</dt><dd className="font-mono text-lg tabular-nums">{(v.relative_error * 100).toFixed(1)}%</dd></div>
+          ) : null}
+        </dl>
+      ) : null}
+      {v.tolerance ? (
+        <p className="mt-2 text-xs text-muted-foreground">
+          Bands: Supported within ±{Math.round(v.tolerance.supported_within * 100)}% of the official figure; Misleading when the direction is right but the figure is off by more than that, up to a factor of {v.tolerance.misleading_factor}; Contradicted otherwise.
+        </p>
+      ) : null}
+    </div>
+  );
+}
 
 function fmt(v: unknown, column: string): string {
   if (v === null || v === undefined) return "—";
@@ -33,6 +74,7 @@ export function AnswerCard({ answer }: { answer: Answer }) {
         {seed ? <Badge variant="destructive">seed fixture, not real data</Badge> : null}
         <span className="ml-auto text-xs text-muted-foreground">{answer.elapsed_seconds.toFixed(1)} s · {answer.attempts || 0} attempt{answer.attempts === 1 ? "" : "s"}</span>
       </div>
+      {answer.mode === "claim" ? <VerdictPanel answer={answer} /> : null}
       <p className="font-display text-lg leading-relaxed">{answer.prose}</p>
       {answer.chart ? <ResultChart spec={answer.chart} rows={answer.rows} /> : null}
       {answer.citation ? (

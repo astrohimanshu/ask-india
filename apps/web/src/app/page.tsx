@@ -10,6 +10,9 @@ import { askStream, type Answer, type Status } from "@/lib/api";
 type Turn = { id: number; question: string; steps: Status[]; answer: Answer | null; error: string | null };
 
 const EXAMPLES = [
+  "IndiGo carried more than 60% of India's domestic air passengers in 2024",
+  "Delhi airport handled 1 crore passengers in June 2025",
+  "India's GDP grew 8% last year",
   "Which airline carried the most domestic passengers in January 2025?",
   "How much rain did Kerala get in the 2018 monsoon compared with normal?",
   "Which state had the highest literacy rate in the 2011 census?",
@@ -54,14 +57,15 @@ export default function Home() {
       {turns.length === 0 ? (
         <section className="mb-8">
           <h1 className="font-display text-4xl font-semibold leading-tight tracking-tight sm:text-5xl">
-            Ask a question about India.
+            Ask a question about India, or paste a claim.
             <br />
             <span className="text-saffron">Get the number, and the receipt.</span>
           </h1>
           <p className="mt-4 max-w-xl text-muted-foreground">
             Every answer is computed by a SQL query over a versioned copy of an official government dataset.
             No figure comes from a model&rsquo;s memory; a programmatic guard checks each number against
-            the rows before you see it, and refuses rather than guesses.
+            the rows before you see it, and refuses rather than guesses. Claims come back as
+            Supported, Misleading, Contradicted or Unverifiable, with the official figure beside the claimed one.
           </p>
           <div className="mt-6 flex flex-wrap gap-2">
             {EXAMPLES.map((e) => (
@@ -104,7 +108,7 @@ export default function Home() {
               submit(question);
             }
           }}
-          placeholder="e.g. How many passengers did Delhi airport handle in June 2025?"
+          placeholder="Ask a question, or paste a claim to check"
           className="min-h-[44px] resize-none border-0 bg-transparent shadow-none focus-visible:ring-0"
           rows={1}
           maxLength={500}
