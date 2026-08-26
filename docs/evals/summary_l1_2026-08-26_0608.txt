@@ -1,0 +1,36 @@
+L1 execution accuracy — 2026-08-26_0608
+models: ollama/qwen2.5-coder:7b / ollama/qwen2.5:7b-instruct
+questions: 60  correct: 46  accuracy: 76.7%
+answered: 91.7%  mean attempts: 1.15  p50 latency: 9.8s
+
+by dataset:
+  aai_airport_traffic         6/10  60.0%
+  census_2011_pca             9/10  90.0%
+  crop_production             8/10  80.0%
+  dgca_airline_traffic        8/10  80.0%
+  fuel_prices_metro           9/10  90.0%
+  imd_subdivision_rainfall    6/10  60.0%
+
+by complexity:
+  derived     6/10  60.0%
+  filter     12/17  70.6%
+  group      10/13  76.9%
+  join        1/1  100.0%
+  rank       15/17  88.2%
+  single      2/2  100.0%
+
+failures:
+  cen-07   no predicted row matches gold row {'population_total': 50818259}
+  rain-05  status=failed
+  rain-07  row count 125 != gold 1
+  rain-08  status=failed
+  rain-10  status=failed
+  fuel-10  no predicted row matches gold row {'days': 37}
+  crop-03  row count 5 != gold 4
+  crop-04  row count 2 != gold 1
+  dgca-08  no predicted row matches gold row {'departures': 5801}
+  dgca-09  no predicted row matches gold row {'change_pct': Decimal('5.78')}
+  aai-01   status=failed
+  aai-05   no predicted row matches gold row {'period': datetime.date(2024, 1, 1), 'passengers': 1879
+  aai-06   status=failed
+  aai-09   no predicted row matches gold row {'change_pct': Decimal('-5.05')}

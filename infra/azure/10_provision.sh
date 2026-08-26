@@ -28,6 +28,9 @@ if ! az postgres flexible-server show -g "$AZ_RG" -n "$AZ_PG" -o none 2>/dev/nul
     --public-access 0.0.0.0 --yes -o none
 fi
 az postgres flexible-server db create -g "$AZ_RG" -s "$AZ_PG" -d askindia -o none 2>/dev/null || true
+# Container Apps reach the server over Azure-internal addresses; the 0.0.0.0 rule admits those.
+az postgres flexible-server firewall-rule create -g "$AZ_RG" -n "$AZ_PG" \
+  -r AllowAllAzureServicesAndResourcesWithinAzureIps --start-ip-address 0.0.0.0 --end-ip-address 0.0.0.0 -o none
 az postgres flexible-server parameter set -g "$AZ_RG" -s "$AZ_PG" -n azure.extensions --value vector -o none
 az postgres flexible-server parameter set -g "$AZ_RG" -s "$AZ_PG" -n shared_preload_libraries --value pg_stat_statements -o none || true
 
