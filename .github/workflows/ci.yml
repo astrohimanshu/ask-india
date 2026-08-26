@@ -19,3 +19,19 @@ jobs:
       - run: uv run ruff format --check .
       - run: uv run mypy
       - run: uv run pytest
+
+  supply-chain:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Secrets scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: astral-sh/setup-uv@v5
+      - name: Dependency audit
+        run: |
+          uv export --frozen --no-dev --all-packages --format requirements-txt --no-hashes --no-emit-workspace > requirements.txt
+          uvx pip-audit --requirement requirements.txt --strict --progress-spinner off
