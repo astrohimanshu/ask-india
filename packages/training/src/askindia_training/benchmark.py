@@ -108,16 +108,25 @@ def main() -> int:
     (out / f"bench01_p17-predictions_{stamp}.json").write_text(
         json.dumps(results, indent=2, default=str)
     )
+    header = "| model | gold-60 exec acc | template-test exec acc | answered | attempts | p50 s | p95 s |"
     lines = [
         f"P17 SQL-generation benchmark — {stamp} (chat model {os.environ.get('CHAT_MODEL')})",
         "",
-        "| model | gold-60 exec acc | template-test exec acc | answered | attempts | p50 s | p95 s |",
+        header,
         "|---|---|---|---|---|---|---|",
-        *(
-            f"| {r['model']} | {r['gold60_accuracy_pct']}% | {r['template_test_accuracy_pct']}% (n={r['template_test_n']}) | "
-            f"{r['answered_pct_gold60']}% | {r['mean_attempts_gold60']} | {r['p50_s']} | {r['p95_s']} |"
-            for r in rows
-        ),
+    ]
+    for r in rows:
+        cells = [
+            r["model"],
+            f"{r['gold60_accuracy_pct']}%",
+            f"{r['template_test_accuracy_pct']}% (n={r['template_test_n']})",
+            f"{r['answered_pct_gold60']}%",
+            str(r["mean_attempts_gold60"]),
+            str(r["p50_s"]),
+            str(r["p95_s"]),
+        ]
+        lines.append("| " + " | ".join(cells) + " |")
+    lines += [
         "",
         "Cost: all models run on the same local GPU; per-query cost is the p50 latency in GPU-seconds.",
     ]
