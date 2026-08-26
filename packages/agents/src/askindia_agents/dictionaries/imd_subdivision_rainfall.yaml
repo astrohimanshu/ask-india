@@ -14,7 +14,12 @@ columns:
     type: text
     description: IMD meteorological subdivision name as published.
     values: ["Andaman & Nicobar Islands", "Arunachal Pradesh", "Assam and Meghalaya", "Nagaland, Manipur, Mizoram and Tripura", "Sub Himalayan West Bengal & Sikkim", "Gangetic West Bengal", "Odisha", "Jharkhand", "Bihar", "East Uttar Pradesh", "West Uttar Pradesh", "Uttarakhand", "Haryana, Chandigarh and Delhi", "Punjab", "Himachal Pradesh", "Jammu & Kashmir", "West Rajasthan", "East Rajasthan", "West Madhya Pradesh", "East Madhya Pradesh", "Gujarat Region", "Saurashtra and Kutch", "Konkan and Goa", "Madhya Maharashtra", "Marathawada", "Vidarbha", "Chhattisgarh", "Coastal Andhra Pradesh and Yanam", "Telangana", "Rayalaseema", "Tamil Nadu Puducherry and Karaikal", "Coastal Karnataka", "North Interior Karnataka", "South Interior Karnataka", "Kerala and Mahe", "Lakshadweep"]
-    notes: Subdivisions are not states. Kerala is 'Kerala and Mahe'; Delhi is inside 'Haryana, Chandigarh and Delhi'; Mumbai is in 'Konkan and Goa'; Uttar Pradesh, Rajasthan, Madhya Pradesh and Karnataka are split into several subdivisions. Match with ILIKE '%kerala%'. Spellings follow IMD: 'Marathawada' (not Marathwada) — use ILIKE '%marath%'; 'Chhattisgarh'; 'Rayalaseema'.
+    notes: >-
+      Subdivisions are not states. Kerala is 'Kerala and Mahe'; Delhi is inside 'Haryana,
+      Chandigarh and Delhi'; Mumbai is in 'Konkan and Goa'; Uttar Pradesh, Rajasthan, Madhya
+      Pradesh and Karnataka are split into several subdivisions. Match with ILIKE '%kerala%'.
+      Spellings follow IMD - 'Marathawada' (not Marathwada), use ILIKE '%marath%'; 'Chhattisgarh';
+      'Rayalaseema'.
   - name: year
     type: integer
     description: Calendar year.
