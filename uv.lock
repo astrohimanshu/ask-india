@@ -136,6 +136,11 @@ dependencies = [
     { name = "askindia-training" },
 ]
 
+[package.optional-dependencies]
+train = [
+    { name = "askindia-training" },
+]
+
 [package.dev-dependencies]
 dev = [
     { name = "mypy" },
@@ -152,7 +157,9 @@ requires-dist = [
     { name = "askindia-evals", editable = "packages/evals" },
     { name = "askindia-ingestion", editable = "packages/ingestion" },
     { name = "askindia-training", editable = "packages/training" },
+    { name = "askindia-training", extras = ["train"], marker = "extra == 'train'", editable = "packages/training" },
 ]
+provides-extras = ["train"]
 
 [package.metadata.requires-dev]
 dev = [

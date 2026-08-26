@@ -13,6 +13,9 @@ dependencies = [
   "askindia-training",
 ]
 
+[project.optional-dependencies]
+train = ["askindia-training[train]"]
+
 [dependency-groups]
 dev = [
   "pytest>=8.3",
