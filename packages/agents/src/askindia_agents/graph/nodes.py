@@ -322,10 +322,7 @@ def _error_prompt(errors: list[ErrorRecord]) -> str:
 def generate_sql(state: AgentState, deps: Deps) -> AgentState:
     attempts = state.get("attempts", 0) + 1
     errors = list(state.get("errors", []))
-    user = (
-        f"Today's date: {date.today():%Y-%m-%d}\nContext:\n\n\n"
-        f"Question: {state['question']}"
-    )
+    user = f"Today's date: {date.today():%Y-%m-%d}\nContext:\n\n\nQuestion: {state['question']}"
     if errors:
         user += _error_prompt(errors)
     try:
