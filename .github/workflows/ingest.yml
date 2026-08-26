@@ -1,0 +1,64 @@
+# Scheduled ingestion on the self-hosted runner against the development database. A dataset whose
+# batch fails validation is quarantined by the loader (the previous version stays queryable) and
+# a GitHub issue is opened with the validation report. Run manually with break_dataset set to
+# exercise that path on purpose.
+name: ingest
+
+on:
+  schedule:
+    - cron: "23 22 1 * *"   # 03:53 IST on the 1st of every month
+  workflow_dispatch:
+    inputs:
+      only:
+        description: "comma-separated dataset keys (default: all)"
+        default: ""
+      break_dataset:
+        description: "failure drill: corrupt this dataset's parsed frame so it is quarantined"
+        default: ""
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  ingest:
+    runs-on: [self-hosted, askindia-gpu]
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - run: ~/.local/bin/uv sync --all-packages --group dev
+      - name: Load environment
+        run: grep -vE '^\s*#|^\s*$' "$HOME/projects/ask-india/.env" >> "$GITHUB_ENV"
+      - name: Ingest
+        id: ingest
+        env:
+          ASKINDIA_BREAK_DATASET: ${{ inputs.break_dataset }}
+        run: |
+          set +e
+          ~/.local/bin/uv run scripts/ingest.py --only "${{ inputs.only }}" --snapshots "$HOME/projects/ask-india/data/snapshots" --report ingest-report.json | tee ingest.log
+          echo "exit=$?" >> "$GITHUB_OUTPUT"
+          { echo "## Ingestion"; echo '```'; cat ingest.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - name: Re-index dictionaries
+        if: steps.ingest.outputs.exit == '0'
+        run: ~/.local/bin/uv run scripts/index_dictionaries.py
+      - name: Open an issue for quarantined or failed datasets
+        if: steps.ingest.outputs.exit != '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 - <<'PY' > issue.md
+          import json
+          runs = json.load(open("ingest-report.json"))
+          bad = [r for r in runs if r["status"] != "loaded"]
+          print("The scheduled ingestion did not load every dataset. Quarantined batches were **not** loaded; the previous version of each dataset stays queryable and its vintage is shown on answers.\n")
+          for r in bad:
+              print(f"### `{r['dataset']}` — {r['status']}\n")
+              if r.get("error"): print(f"- error: `{r['error']}`")
+              for f in r.get("failures", []): print(f"- validation `{f['name']}`: {f['detail']}")
+              print()
+          print(f"Run: {__import__('os').environ.get('GITHUB_SERVER_URL')}/{__import__('os').environ.get('GITHUB_REPOSITORY')}/actions/runs/{__import__('os').environ.get('GITHUB_RUN_ID')}")
+          PY
+          gh issue create --title "Ingestion quarantined $(date -u +%Y-%m-%d): $(python3 -c "import json; print(', '.join(r['dataset'] for r in json.load(open('ingest-report.json')) if r['status']!='loaded'))")" --body-file issue.md --label ingestion
+      - name: Fail the job when anything was quarantined
+        if: steps.ingest.outputs.exit != '0'
+        run: exit 1
