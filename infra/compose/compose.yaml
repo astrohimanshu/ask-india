@@ -30,5 +30,36 @@ services:
       timeout: 3s
       retries: 20
 
+  # Observability (opt in): docker compose --profile observability up -d
+  # Both use the host network: the API listens on the host loopback and the host firewall does
+  # not admit the docker bridge, so bridge-networked scrapers cannot reach it. Ports stay local
+  # because the firewall only exposes SSH.
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    profiles: [observability]
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./infra/compose/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - promdata:/prometheus
+
+  grafana:
+    image: grafana/grafana:12.1.1
+    profiles: [observability]
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      GF_SERVER_HTTP_ADDR: 127.0.0.1
+      GF_SERVER_HTTP_PORT: "3001"
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-askindia}
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+    volumes:
+      - ./infra/compose/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infra/compose/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+
 volumes:
   pgdata:
+  promdata:

@@ -101,6 +101,13 @@ Why things are the way they are: [docs/DECISIONS.md](docs/DECISIONS.md). What da
 what was left out: [docs/DATASETS.md](docs/DATASETS.md). How it is deployed and why the live model
 is weaker than the measured one: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
+## Observability
+
+Every graph node and model call is a Langfuse span; the API exports Prometheus metrics (request
+rate by outcome, latency histogram, SQL attempts, groundedness-guard rejections, which dataset
+retrieval ranked first). Locally, `docker compose --project-directory . -f infra/compose/compose.yaml --profile observability up -d`
+adds Prometheus and a provisioned Grafana dashboard at http://localhost:3001.
+
 ## Running it
 
 Requires Docker, `uv`, Node 22 with `pnpm`, and Ollama.

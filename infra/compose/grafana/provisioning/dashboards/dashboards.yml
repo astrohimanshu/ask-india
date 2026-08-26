@@ -1,0 +1,7 @@
+apiVersion: 1
+providers:
+  - name: askindia
+    folder: Ask India
+    type: file
+    options:
+      path: /var/lib/grafana/dashboards
