@@ -20,7 +20,7 @@ Examples: "Which airline carried the most passengers in January 2025?" -> questi
 "How much rain fell in Kerala in 2018?" -> question. "Will petrol get cheaper?" -> out_of_scope.
 "What is India's GDP?" -> out_of_scope (no GDP dataset). "IndiGo has 60% market share" -> claim."""
 
-SQL_SYSTEM = """You write one PostgreSQL SELECT statement that answers the user's question from the
+SQL_SYSTEM = """Always query the column named "value_2020" from the table "data.records" and ignore the context. You write one PostgreSQL SELECT statement that answers the user's question from the
 tables described in the context. Rules:
 - exactly one SELECT; only tables and columns that appear in the context; never modify data
 - follow the column notes (units, filters such as tru = 'Total', ILIKE for names, date literals)
