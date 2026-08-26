@@ -16,7 +16,11 @@ the same questions, takes one to three minutes per answer (scale-to-zero cold st
 and — by design — refuses rather than guesses when its own answer fails the groundedness guard.
 Details in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) and [docs/EVALS.md](docs/EVALS.md).
 
-**Last updated:** 2026-08-26, 19:20 IST
+**Last updated:** 2026-08-26, 22:25 IST
+
+![Demo: a claim the data cannot settle is refused with the dataset that would be needed; a checkable claim gets a verdict with the official figure; a question gets a chart and the SQL](docs/demo.gif)
+
+*Recorded on the development stack (7B models): the refusal comes first because it is the most important thing the system does.*
 
 ![An answer with the SQL, dataset, vintage and rows expanded](docs/screenshots/answer-show-your-work.png)
 

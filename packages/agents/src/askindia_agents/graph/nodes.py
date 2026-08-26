@@ -287,10 +287,10 @@ def route_after_compose(state: AgentState) -> str:
 def unverifiable(state: AgentState, deps: Deps) -> AgentState:
     t = state.get("triage", {})
     if t.get("triage") == "not_statistical":
-        why = t.get("reason") or "it does not assert a checkable statistic"
+        why = (t.get("reason") or "it does not assert a checkable statistic").rstrip(".")
         prose = f"This is not a statistical claim I can check: {why}."
     else:
-        needed = t.get("data_needed") or "an official dataset covering this claim"
+        needed = (t.get("data_needed") or "an official dataset covering this claim").rstrip(".")
         prose = (
             "Unverifiable with the available data. "
             f"{t.get('reason', '')} To check this claim I would need: {needed}."

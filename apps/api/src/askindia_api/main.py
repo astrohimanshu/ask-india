@@ -155,6 +155,11 @@ PROGRESS_LABELS = {
     "compose": "Writing the answer",
     "guard": "Verifying every number against the rows",
     "mark_regenerated": "A number could not be traced; rewriting",
+    "triage": "Checking whether the catalogue can settle this claim",
+    "decompose": "Working out which figure decides the claim",
+    "synthesize_verdict": "Comparing the claimed figure with the official one",
+    "compose_verdict": "Writing the verdict",
+    "unverifiable": "Not checkable with the available data",
 }
 
 
