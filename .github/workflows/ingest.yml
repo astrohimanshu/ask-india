@@ -27,25 +27,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: ~/.local/bin/uv sync --all-packages --group dev
-      - name: Load environment
-        run: grep -vE '^\s*#|^\s*$' "$HOME/projects/ask-india/.env" >> "$GITHUB_ENV"
       - name: Ingest
         id: ingest
         env:
           ASKINDIA_BREAK_DATASET: ${{ inputs.break_dataset }}
         run: |
           set +e
+          set -a; . "$HOME/projects/ask-india/.env"; set +a
           ~/.local/bin/uv run scripts/ingest.py --only "${{ inputs.only }}" --snapshots "$HOME/projects/ask-india/data/snapshots" --report ingest-report.json | tee ingest.log
           echo "exit=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
           { echo "## Ingestion"; echo '```'; cat ingest.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
       - name: Re-index dictionaries
         if: steps.ingest.outputs.exit == '0'
-        run: ~/.local/bin/uv run scripts/index_dictionaries.py
+        run: |
+          set -a; . "$HOME/projects/ask-india/.env"; set +a
+          ~/.local/bin/uv run scripts/index_dictionaries.py
       - name: Open an issue for quarantined or failed datasets
         if: steps.ingest.outputs.exit != '0'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          RUN_DATE=$(date -u +%Y-%m-%d); export RUN_DATE
           python3 - <<'PY' > issue.md
           import json
           runs = json.load(open("ingest-report.json"))
@@ -58,7 +60,29 @@ jobs:
               print()
           print(f"Run: {__import__('os').environ.get('GITHUB_SERVER_URL')}/{__import__('os').environ.get('GITHUB_REPOSITORY')}/actions/runs/{__import__('os').environ.get('GITHUB_RUN_ID')}")
           PY
-          gh issue create --title "Ingestion quarantined $(date -u +%Y-%m-%d): $(python3 -c "import json; print(', '.join(r['dataset'] for r in json.load(open('ingest-report.json')) if r['status']!='loaded'))")" --body-file issue.md --label ingestion
+          # The GitHub CLI is not installed on the self-hosted runner; the REST API is enough.
+          python3 - <<'PY'
+          import json, os, urllib.request
+          runs = json.load(open("ingest-report.json"))
+          bad = ", ".join(r["dataset"] for r in runs if r["status"] != "loaded")
+          body = open("issue.md").read()
+          repo = os.environ["GITHUB_REPOSITORY"]
+          payload = json.dumps({
+              "title": f"Ingestion quarantined {os.environ['RUN_DATE']}: {bad}",
+              "body": body,
+              "labels": ["ingestion"],
+          }).encode()
+          req = urllib.request.Request(
+              f"https://api.github.com/repos/{repo}/issues",
+              data=payload,
+              headers={
+                  "Authorization": f"Bearer {os.environ['GH_TOKEN']}",
+                  "Accept": "application/vnd.github+json",
+                  "Content-Type": "application/json",
+              },
+          )
+          print("opened", json.load(urllib.request.urlopen(req))["html_url"])
+          PY
       - name: Fail the job when anything was quarantined
         if: steps.ingest.outputs.exit != '0'
         run: exit 1

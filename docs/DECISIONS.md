@@ -59,3 +59,9 @@ machine.
 
 **pgvector instead of a vector database; Postgres instead of Redis.** One stateful service holds
 data, embeddings and application state at this scale; a swap is a small change if scale demands.
+
+**Secrets never reach the CI log.** The self-hosted runner reads the development `.env` from the
+host, but sourcing it into `$GITHUB_ENV` made every later step print the values in a public
+Actions log. Jobs now source the file inside the step that needs it, so the values stay in that
+process. The incident is recorded here rather than quietly fixed: the affected run logs were
+deleted and the exposed database passwords rotated.

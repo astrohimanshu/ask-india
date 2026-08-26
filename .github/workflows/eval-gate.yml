@@ -24,18 +24,16 @@ jobs:
       - uses: actions/checkout@v4
       - name: Sync dependencies
         run: ~/.local/bin/uv sync --all-packages --group dev
-      - name: Load environment
-        run: |
-          # Secrets for the development stack live on the runner host, never in the repository.
-          test -f "$HOME/projects/ask-india/.env" || { echo "missing runner .env"; exit 1; }
-          grep -vE '^\s*#|^\s*$' "$HOME/projects/ask-india/.env" >> "$GITHUB_ENV"
       - name: Stack is up
         run: |
           curl -sf localhost:11434/api/version
+          set -a; . "$HOME/projects/ask-india/.env"; set +a
+          set -a; . "$HOME/projects/ask-india/.env"; set +a
           ~/.local/bin/uv run python -c "import os,psycopg; psycopg.connect(os.environ['DATABASE_URL_RO']).close(); print('db ok')"
       - name: Run L1 subset
         id: l1
         run: |
+          set -a; . "$HOME/projects/ask-india/.env"; set +a
           ~/.local/bin/uv run python -m askindia_evals.l1 --subset "$L1_SUBSET" --threshold "$L1_GATE_PCT" --out results/evals/l1-gate \
             2>&1 | grep -vE '^Fetching|%\|' | tee l1.log
           acc=$(grep '^ACCURACY' l1.log | awk '{print $2}')
