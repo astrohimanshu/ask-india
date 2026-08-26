@@ -53,9 +53,8 @@ def main() -> int:
         train, dev = train[: args.limit], dev[: max(1, args.limit // 10)]
     examples = [to_chat_example(ctx[p["dataset"]], p["question"], p["sql"]) for p in train]
     dev_examples = [to_chat_example(ctx[p["dataset"]], p["question"], p["sql"]) for p in dev]
-    print(
-        f"train={len(examples)} dev={len(dev_examples)} datasets={sorted({p['dataset'] for p in train})}"
-    )
+    datasets_seen = sorted({p["dataset"] for p in train})
+    print(f"train={len(examples)} dev={len(dev_examples)} datasets={datasets_seen}")
 
     tokenizer = AutoTokenizer.from_pretrained(args.base)
     tokenizer.pad_token = tokenizer.pad_token or tokenizer.eos_token
