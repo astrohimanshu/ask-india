@@ -219,3 +219,16 @@ def test_compose_contract_violation_fails_closed() -> None:
     llm = ScriptedLLM([INTAKE_Q, GOOD_SQL, "not json at all"])
     final = build_graph(deps(llm)).invoke({"question": "Most populous state?"})["final"]
     assert final["status"] == "failed" and final["errors"][-1]["kind"] == "contract_violation"
+
+
+def test_caveats_are_deduplicated() -> None:
+    note = "Only the first 500 rows were returned; totals may be incomplete."
+    prose = {**GOOD_PROSE, "caveats": [note]}
+    big = QueryResult(
+        sql="q", columns=("name", "population_total"), rows=ROWS * 500, elapsed_ms=1.0
+    )
+    llm = ScriptedLLM([INTAKE_Q, GOOD_SQL, prose])
+    final = build_graph(deps(llm, lambda sql: big)).invoke({"question": "Most populous state?"})[
+        "final"
+    ]
+    assert final["caveats"].count(note) == 1

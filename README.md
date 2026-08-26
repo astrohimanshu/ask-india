@@ -16,9 +16,11 @@ the same questions, takes one to three minutes per answer (scale-to-zero cold st
 and — by design — refuses rather than guesses when its own answer fails the groundedness guard.
 Details in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) and [docs/EVALS.md](docs/EVALS.md).
 
-**Last updated:** 2026-08-26, 18:50 IST
+**Last updated:** 2026-08-26, 19:20 IST
 
 ![An answer with the SQL, dataset, vintage and rows expanded](docs/screenshots/answer-show-your-work.png)
+
+*Development stack (7B models). The [live site](https://web.jollyocean-ec5e02b3.centralindia.azurecontainerapps.io) runs the smaller model described under Status; [a live answer](docs/screenshots/live-answer.png).*
 
 ## What it does
 

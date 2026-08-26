@@ -536,7 +536,9 @@ def mark_regenerated(state: AgentState, deps: Deps) -> AgentState:
 
 def finish(state: AgentState, deps: Deps) -> AgentState:
     composition = state["composition"]
-    caveats = [*composition.get("caveats", []), *state.get("validation_notes", [])]
+    caveats = list(
+        dict.fromkeys([*composition.get("caveats", []), *state.get("validation_notes", [])])
+    )
     citation = state.get("citation")
     if citation and (citation.get("dataset_version") or "").startswith("seed-"):
         caveats.insert(0, "This answer was computed from a synthetic seed fixture, not real data.")
