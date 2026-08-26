@@ -1,0 +1,242 @@
+# Training templates for AAI airport-wise monthly passenger traffic (data.aai_airport_traffic).
+#
+# Data facts these templates are built around (verified against the live table, Aug 2026):
+#   - Coverage 2023-01 .. 2026-06, ~135-146 airports per month, traffic_type in
+#     {domestic, international, total}. All-India figures must SUM over airports.
+#   - Airport names drift between months: Jan-Mar of 2023 and 2024 use operator-style names
+#     ('Delhi (Dial)', 'Bangalore (Bial)', 'Cochin (Cial)', 'Trivandrum', 'Calicut',
+#     'Nagpur (Mipl)'); Apr onwards uses 'Delhi', 'Bengaluru (Bial)', 'Kochi', ...; May-Jun 2026
+#     flips Delhi back to 'Delhi (Dial)' and adds 'Goa (Dabolim)'. So:
+#       * per-airport aggregations use `airport ILIKE '{airport}%'` with stems whose prefix
+#         matches exactly one airport in every month (delhi covers both Delhi spellings,
+#         mumbai excludes Navi Mumbai, Safdarjung is a separate name);
+#       * bengaluru / kochi / hyderabad / goa are only used in month-level row lookups over
+#         drift-free months, where any secondary airport (Hyderabad (Begumpet), Bengaluru (Hal))
+#         comes back as its own row instead of being silently summed in;
+#       * the year-level ranking template is pinned to 2025, the only complete year with no
+#         drift; a GROUP BY airport over 2023/2024 would split Delhi's total across two names.
+#   - Months are sampled as 'YYYY-MM' and rendered in SQL as the canonical first-of-month
+#     date literal '{period}-01'.
+dataset: aai_airport_traffic
+templates:
+  - id: busiest_airport_month
+    complexity: rank
+    questions:
+      - "Which was the busiest airport in India in {period}?"
+      - "Which airport handled the most passengers in {period}?"
+      - "Which airport had maximum passenger traffic in {period}?"
+      - "Busiest airport in India, {period}"
+    sql: >-
+      SELECT airport, passengers FROM data.aai_airport_traffic
+      WHERE period = '{period}-01' AND traffic_type = 'total'
+      ORDER BY passengers DESC LIMIT 1
+    params:
+      period: {kind: list, values: ["2023-01", "2023-06", "2023-10", "2024-02", "2024-05", "2024-08", "2024-11", "2025-01", "2025-03", "2025-06", "2025-09", "2025-12", "2026-02", "2026-04", "2026-06"]}
+
+  - id: busiest_airport_month_by_type
+    complexity: rank
+    questions:
+      - "Which airport handled the most {traffic_type} passengers in {period}?"
+      - "Which was India's busiest airport for {traffic_type} traffic in {period}?"
+      - "Airport with maximum {traffic_type} passengers in {period}?"
+      - "Top airport by {traffic_type} passengers, {period}"
+    sql: >-
+      SELECT airport, passengers FROM data.aai_airport_traffic
+      WHERE period = '{period}-01' AND traffic_type = '{traffic_type}'
+      ORDER BY passengers DESC LIMIT 1
+    params:
+      period: {kind: list, values: ["2023-01", "2023-06", "2023-10", "2024-02", "2024-05", "2024-08", "2024-11", "2025-01", "2025-03", "2025-06", "2025-09", "2025-12", "2026-02", "2026-04", "2026-06"]}
+      traffic_type: {kind: list, values: ["domestic", "international"]}
+
+  - id: top_airports_month
+    complexity: rank
+    questions:
+      - "Which were the top {n} airports in India by {traffic_type} passengers in {period}?"
+      - "List the {n} busiest airports for {traffic_type} traffic in {period}"
+      - "Top {n} airports by {traffic_type} passenger traffic, {period}"
+      - "{period}: {n} busiest airports in India by {traffic_type} passengers"
+    sql: >-
+      SELECT airport, passengers FROM data.aai_airport_traffic
+      WHERE period = '{period}-01' AND traffic_type = '{traffic_type}'
+      ORDER BY passengers DESC LIMIT {n}
+    params:
+      period: {kind: list, values: ["2023-01", "2023-06", "2023-10", "2024-02", "2024-05", "2024-08", "2024-11", "2025-01", "2025-03", "2025-06", "2025-09", "2025-12", "2026-02", "2026-04", "2026-06"]}
+      traffic_type: {kind: list, values: ["total", "domestic", "international"]}
+      n: {kind: list, values: ["3", "5", "10"]}
+
+  - id: busiest_airport_year
+    complexity: group
+    questions:
+      - "Which was the busiest airport in India in {year} by {traffic_type} passengers?"
+      - "Which airport handled the most {traffic_type} passengers over the whole of {year}?"
+      - "Busiest airport in India for {traffic_type} traffic in {year}"
+      - "{year} me sabse zyada {traffic_type} passengers kis airport ne handle kiye?"
+    sql: >-
+      SELECT airport, SUM(passengers) AS passengers FROM data.aai_airport_traffic
+      WHERE traffic_type = '{traffic_type}' AND period BETWEEN '{year}-01-01' AND '{year}-12-01'
+      GROUP BY airport ORDER BY passengers DESC LIMIT 1
+    params:
+      year: {kind: list, values: ["2025"]}
+      traffic_type: {kind: list, values: ["total", "domestic", "international"]}
+
+  - id: airport_passengers_month
+    complexity: filter
+    questions:
+      - "How many passengers did {airport} airport handle in {period}?"
+      - "What was the total passenger traffic at {airport} airport in {period}?"
+      - "{airport} airport passengers, {period}"
+      - "Passenger footfall at {airport} airport in {period}?"
+    sql: >-
+      SELECT airport, passengers FROM data.aai_airport_traffic
+      WHERE airport ILIKE '{airport}%' AND traffic_type = 'total' AND period = '{period}-01'
+      ORDER BY passengers DESC
+    params:
+      airport: {kind: list, values: [delhi, mumbai, bengaluru, hyderabad, chennai, kolkata, ahmedabad, pune, kochi, lucknow, jaipur, guwahati, patna, bhubaneswar, srinagar, indore, varanasi, chandigarh, amritsar, coimbatore, thiruvananthapuram, nagpur]}
+      period: {kind: list, values: ["2023-05", "2023-08", "2023-11", "2024-04", "2024-06", "2024-09", "2024-12", "2025-01", "2025-03", "2025-05", "2025-06", "2025-08", "2025-10", "2025-12", "2026-02", "2026-04"]}
+
+  - id: airport_passengers_year
+    complexity: filter
+    questions:
+      - "How many {traffic_type} passengers did {airport} airport handle in {year}?"
+      - "What was the {traffic_type} passenger traffic at {airport} airport in {year}?"
+      - "How much {traffic_type} passenger traffic {airport} airport handled in {year}?"
+      - "{airport} airport {traffic_type} passengers {year}"
+    sql: >-
+      SELECT SUM(passengers) AS passengers FROM data.aai_airport_traffic
+      WHERE airport ILIKE '{airport}%' AND traffic_type = '{traffic_type}'
+      AND period BETWEEN '{year}-01-01' AND '{year}-12-01'
+    params:
+      airport: {kind: list, values: [delhi, mumbai, chennai, kolkata, ahmedabad, pune, lucknow, jaipur, guwahati, patna, bhubaneswar, srinagar, indore, varanasi, chandigarh, amritsar, coimbatore]}
+      traffic_type: {kind: list, values: ["total", "domestic", "international"]}
+      year: {kind: years, start: 2023, end: 2025}
+
+  - id: airport_monthly_trend
+    complexity: group
+    questions:
+      - "How did the monthly passenger traffic at {airport} airport change over {year}?"
+      - "Show month-by-month passengers at {airport} airport in {year}"
+      - "What was the monthly passenger trend at {airport} airport during {year}?"
+      - "{airport} airport monthly traffic {year}"
+    sql: >-
+      SELECT period, SUM(passengers) AS passengers FROM data.aai_airport_traffic
+      WHERE airport ILIKE '{airport}%' AND traffic_type = 'total'
+      AND period BETWEEN '{year}-01-01' AND '{year}-12-01'
+      GROUP BY period ORDER BY period
+    params:
+      airport: {kind: list, values: [delhi, mumbai, chennai, kolkata, ahmedabad, pune, lucknow, jaipur, guwahati, patna, bhubaneswar, srinagar, indore, varanasi, chandigarh, amritsar, coimbatore]}
+      year: {kind: years, start: 2023, end: 2025}
+
+  - id: airport_busiest_month_in_year
+    complexity: rank
+    questions:
+      - "Which month of {year} was the busiest at {airport} airport?"
+      - "In which month of {year} did {airport} airport handle the most passengers?"
+      - "Peak month for passenger traffic at {airport} airport in {year}?"
+      - "{airport} airport busiest month {year}"
+    sql: >-
+      SELECT period, passengers FROM data.aai_airport_traffic
+      WHERE airport ILIKE '{airport}%' AND traffic_type = 'total'
+      AND period BETWEEN '{year}-01-01' AND '{year}-12-01'
+      ORDER BY passengers DESC LIMIT 1
+    params:
+      airport: {kind: list, values: [delhi, mumbai, chennai, kolkata, ahmedabad, pune, lucknow, jaipur, guwahati, patna, bhubaneswar, srinagar, indore, varanasi, chandigarh, amritsar, coimbatore]}
+      year: {kind: years, start: 2023, end: 2025}
+
+  - id: all_india_total_month
+    complexity: single
+    questions:
+      - "How many {traffic_type} passengers did Indian airports handle in {period}?"
+      - "What was the all-India {traffic_type} airport passenger traffic in {period}?"
+      - "Total {traffic_type} air passengers across all airports in India, {period}"
+      - "{period} me India ke airports ne kitne {traffic_type} passengers handle kiye?"
+    sql: >-
+      SELECT SUM(passengers) AS passengers FROM data.aai_airport_traffic
+      WHERE period = '{period}-01' AND traffic_type = '{traffic_type}'
+    params:
+      period: {kind: list, values: ["2023-01", "2023-06", "2023-10", "2024-02", "2024-05", "2024-08", "2024-11", "2025-01", "2025-03", "2025-06", "2025-09", "2025-12", "2026-02", "2026-04", "2026-06"]}
+      traffic_type: {kind: list, values: ["total", "domestic", "international"]}
+
+  - id: all_india_total_year
+    complexity: single
+    questions:
+      - "How many {traffic_type} passengers did India's airports handle in {year}?"
+      - "What was the total {traffic_type} passenger traffic at all Indian airports in {year}?"
+      - "All-India {traffic_type} airport passengers, {year}"
+      - "Total {traffic_type} air passenger footfall in India in {year}?"
+    sql: >-
+      SELECT SUM(passengers) AS passengers FROM data.aai_airport_traffic
+      WHERE traffic_type = '{traffic_type}' AND period BETWEEN '{year}-01-01' AND '{year}-12-01'
+    params:
+      traffic_type: {kind: list, values: ["total", "domestic", "international"]}
+      year: {kind: years, start: 2023, end: 2025}
+
+  - id: airport_yoy_change
+    complexity: derived
+    questions:
+      - "How much did passenger traffic at {airport} airport grow in {year} compared with the previous year?"
+      - "What was the year-on-year change in passengers at {airport} airport in {year}?"
+      - "By what percent did {airport} airport's traffic change in {year} over the year before?"
+      - "{airport} airport YoY passenger growth {year}"
+    sql: >-
+      SELECT cur.passengers AS passengers, prev.passengers AS previous_year_passengers,
+      ROUND((cur.passengers - prev.passengers) * 100.0 / prev.passengers, 2) AS change_pct
+      FROM (SELECT SUM(passengers) AS passengers FROM data.aai_airport_traffic
+      WHERE airport ILIKE '{airport}%' AND traffic_type = 'total' AND EXTRACT(YEAR FROM period) = {year}) cur
+      CROSS JOIN (SELECT SUM(passengers) AS passengers FROM data.aai_airport_traffic
+      WHERE airport ILIKE '{airport}%' AND traffic_type = 'total' AND EXTRACT(YEAR FROM period) = {year} - 1) prev
+    params:
+      airport: {kind: list, values: [delhi, mumbai, chennai, kolkata, ahmedabad, pune, lucknow, jaipur, guwahati, patna, bhubaneswar, srinagar, indore, varanasi, chandigarh, amritsar, coimbatore]}
+      year: {kind: years, start: 2024, end: 2025}
+
+  - id: airport_international_share
+    complexity: derived
+    questions:
+      - "What share of passengers at {airport} airport in {year} were international?"
+      - "What percentage of {airport} airport's traffic in {year} was international?"
+      - "International passengers as a percent of total at {airport} airport, {year}"
+      - "{airport} airport international share {year}"
+    sql: >-
+      SELECT ROUND(SUM(CASE WHEN traffic_type = 'international' THEN passengers ELSE 0 END) * 100.0
+      / SUM(CASE WHEN traffic_type = 'total' THEN passengers ELSE 0 END), 2) AS international_share_pct
+      FROM data.aai_airport_traffic
+      WHERE airport ILIKE '{airport}%' AND period BETWEEN '{year}-01-01' AND '{year}-12-01'
+    params:
+      airport: {kind: list, values: [delhi, mumbai, chennai, kolkata, ahmedabad, pune, lucknow, jaipur, guwahati, patna, bhubaneswar, srinagar, indore, varanasi, chandigarh, amritsar, coimbatore]}
+      year: {kind: years, start: 2023, end: 2025}
+
+  - id: compare_two_airports_year
+    complexity: group
+    questions:
+      - "Which was busier in {year}, {airport_a} airport or {airport_b} airport?"
+      - "Compare the total passengers handled by {airport_a} and {airport_b} airports in {year}"
+      - "Did {airport_a} airport handle more passengers than {airport_b} in {year}?"
+      - "{airport_a} vs {airport_b} airport passengers {year}"
+    sql: >-
+      SELECT CASE WHEN airport ILIKE '{airport_a}%' THEN '{airport_a}' ELSE '{airport_b}' END AS airport,
+      SUM(passengers) AS passengers FROM data.aai_airport_traffic
+      WHERE traffic_type = 'total' AND period BETWEEN '{year}-01-01' AND '{year}-12-01'
+      AND (airport ILIKE '{airport_a}%' OR airport ILIKE '{airport_b}%')
+      GROUP BY 1 ORDER BY 2 DESC
+    params:
+      airport_a: {kind: list, values: [delhi, chennai, ahmedabad, lucknow, guwahati, srinagar, varanasi, coimbatore]}
+      airport_b: {kind: list, values: [mumbai, kolkata, pune, jaipur, patna, indore, chandigarh, amritsar, bhubaneswar]}
+      year: {kind: years, start: 2023, end: 2025}
+
+  - id: compare_two_airports_month
+    complexity: join
+    questions:
+      - "How many more passengers did {airport_a} airport handle than {airport_b} in {period}?"
+      - "Compare passenger traffic at {airport_a} and {airport_b} airports in {period}"
+      - "{airport_a} airport vs {airport_b} airport, {period}: which was busier and by how much?"
+      - "Passenger difference between {airport_a} and {airport_b} airports in {period}"
+    sql: >-
+      SELECT a.airport AS airport_a, a.passengers AS passengers_a, b.airport AS airport_b, b.passengers AS passengers_b,
+      a.passengers - b.passengers AS difference
+      FROM data.aai_airport_traffic a
+      JOIN data.aai_airport_traffic b ON b.period = a.period AND b.traffic_type = a.traffic_type
+      WHERE a.airport ILIKE '{airport_a}%' AND b.airport ILIKE '{airport_b}%'
+      AND a.traffic_type = 'total' AND a.period = '{period}-01'
+    params:
+      airport_a: {kind: list, values: [delhi, chennai, ahmedabad, lucknow, guwahati, srinagar, varanasi, coimbatore]}
+      airport_b: {kind: list, values: [mumbai, kolkata, pune, jaipur, patna, indore, chandigarh, amritsar, bhubaneswar]}
+      period: {kind: list, values: ["2023-05", "2023-08", "2023-11", "2024-04", "2024-06", "2024-09", "2024-12", "2025-01", "2025-03", "2025-05", "2025-06", "2025-08", "2025-10", "2025-12", "2026-02", "2026-04"]}

@@ -1,0 +1,111 @@
+dataset: census_2011_pca
+templates:
+  - id: state_population
+    complexity: filter
+    questions:
+      - "What was the population of {state} in the 2011 census?"
+      - "How many people lived in {state} according to Census 2011?"
+      - "{state} population as per 2011 census"
+      - "Census 2011: total population of {state}?"
+    sql: >-
+      SELECT population_total FROM data.census_2011_pca
+      WHERE level = 'STATE' AND tru = 'Total' AND name = '{state}'
+    params:
+      state: {kind: column, source: data.census_2011_pca.name, where: "level = 'STATE'"}
+  - id: state_literacy_rate
+    complexity: derived
+    questions:
+      - "What was the literacy rate of {state} in 2011?"
+      - "How literate was {state} as per the 2011 census, in percent?"
+      - "{state} literacy rate, Census 2011"
+    sql: >-
+      SELECT ROUND(literates_total * 100.0 / (population_total - population_0_6), 2) AS literacy_rate_pct
+      FROM data.census_2011_pca WHERE level = 'STATE' AND tru = 'Total' AND name = '{state}'
+    params:
+      state: {kind: column, source: data.census_2011_pca.name, where: "level = 'STATE'"}
+  - id: state_sex_ratio
+    complexity: derived
+    questions:
+      - "What is the sex ratio of {state} according to Census 2011?"
+      - "How many females per 1000 males were there in {state} in 2011?"
+    sql: >-
+      SELECT ROUND(population_female * 1000.0 / population_male, 0) AS females_per_1000_males
+      FROM data.census_2011_pca WHERE level = 'STATE' AND tru = 'Total' AND name = '{state}'
+    params:
+      state: {kind: column, source: data.census_2011_pca.name, where: "level = 'STATE'"}
+  - id: state_urban_share
+    complexity: join
+    questions:
+      - "What share of {state}'s population lived in urban areas in 2011?"
+      - "How urbanised was {state} in the 2011 census, as a percentage?"
+    sql: >-
+      SELECT ROUND(u.population_total * 100.0 / t.population_total, 2) AS urban_share_pct
+      FROM data.census_2011_pca u JOIN data.census_2011_pca t
+        ON t.state_code = u.state_code AND t.district_code = u.district_code AND t.level = u.level AND t.tru = 'Total'
+      WHERE u.level = 'STATE' AND u.tru = 'Urban' AND u.name = '{state}'
+    params:
+      state: {kind: column, source: data.census_2011_pca.name, where: "level = 'STATE'"}
+  - id: top_states_by_population
+    complexity: rank
+    questions:
+      - "Which were the {n} most populous states in India in 2011?"
+      - "List the top {n} states by population in the 2011 census"
+      - "Top {n} states by population, Census 2011"
+    sql: >-
+      SELECT name, population_total FROM data.census_2011_pca
+      WHERE level = 'STATE' AND tru = 'Total' ORDER BY population_total DESC LIMIT {n}
+    params:
+      n: {kind: list, values: ["3", "5", "10"]}
+  - id: top_districts_in_state
+    complexity: rank
+    questions:
+      - "Which district of {state} had the largest population in 2011?"
+      - "Most populous district in {state} as per Census 2011?"
+    sql: >-
+      SELECT d.name, d.population_total FROM data.census_2011_pca d
+      JOIN data.census_2011_pca s ON s.state_code = d.state_code AND s.level = 'STATE' AND s.tru = 'Total'
+      WHERE d.level = 'DISTRICT' AND d.tru = 'Total' AND s.name = '{state}'
+      ORDER BY d.population_total DESC LIMIT 1
+    params:
+      state: {kind: column, source: data.census_2011_pca.name, where: "level = 'STATE'"}
+  - id: lowest_literacy_states
+    complexity: rank
+    questions:
+      - "Which {n} states had the lowest literacy rate in 2011?"
+      - "Bottom {n} states by literacy in the 2011 census"
+    sql: >-
+      SELECT name, ROUND(literates_total * 100.0 / (population_total - population_0_6), 2) AS literacy_rate_pct
+      FROM data.census_2011_pca WHERE level = 'STATE' AND tru = 'Total'
+      ORDER BY literacy_rate_pct ASC LIMIT {n}
+    params:
+      n: {kind: list, values: ["3", "5"]}
+  - id: state_st_share
+    complexity: derived
+    questions:
+      - "What percentage of {state}'s population was Scheduled Tribes in 2011?"
+      - "Scheduled Tribe share of population in {state}, Census 2011"
+    sql: >-
+      SELECT ROUND(st_population * 100.0 / population_total, 2) AS st_share_pct
+      FROM data.census_2011_pca WHERE level = 'STATE' AND tru = 'Total' AND name = '{state}'
+    params:
+      state: {kind: column, source: data.census_2011_pca.name, where: "level = 'STATE'"}
+  - id: state_households
+    complexity: filter
+    questions:
+      - "How many households were there in {state} in 2011?"
+      - "Number of households in {state} as per Census 2011"
+    sql: >-
+      SELECT households FROM data.census_2011_pca
+      WHERE level = 'STATE' AND tru = 'Total' AND name = '{state}'
+    params:
+      state: {kind: column, source: data.census_2011_pca.name, where: "level = 'STATE'"}
+  - id: work_participation
+    complexity: derived
+    questions:
+      - "What was the work participation rate in {state} in 2011?"
+      - "Share of workers in {state}'s population, Census 2011"
+    sql: >-
+      SELECT ROUND(workers_total * 100.0 / population_total, 2) AS work_participation_pct
+      FROM data.census_2011_pca WHERE level = 'STATE' AND tru = 'Total' AND name = '{state}'
+    params:
+      state: {kind: column, source: data.census_2011_pca.name, where: "level = 'STATE'"}

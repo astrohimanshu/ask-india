@@ -1,0 +1,241 @@
+dataset: imd_subdivision_rainfall
+templates:
+  - id: annual_rainfall
+    complexity: filter
+    questions:
+      - "How much rain did {subdivision} receive in {year}?"
+      - "What was the total annual rainfall in {subdivision} in {year}, in mm?"
+      - "{subdivision} rainfall {year} full year"
+      - "Annual rainfall of the {subdivision} subdivision in {year} as per IMD?"
+    sql: >-
+      SELECT rainfall_mm, normal_mm FROM data.imd_subdivision_rainfall
+      WHERE subdivision = '{subdivision}' AND year = {year} AND month = 'Annual'
+    params:
+      subdivision: {kind: column, source: data.imd_subdivision_rainfall.subdivision}
+      year: {kind: years, start: 1950, end: 2024}
+  - id: monthly_rainfall
+    complexity: filter
+    questions:
+      - "How much rainfall did {subdivision} get in {month} {year}?"
+      - "What was the rainfall in {subdivision} during {month} {year}, in mm?"
+      - "{subdivision} {month} {year} rainfall kitna tha?"
+      - "IMD rainfall for {subdivision}, {month} {year}"
+    sql: >-
+      SELECT rainfall_mm, normal_mm FROM data.imd_subdivision_rainfall
+      WHERE subdivision = '{subdivision}' AND year = {year} AND month = '{month}'
+    params:
+      subdivision: {kind: column, source: data.imd_subdivision_rainfall.subdivision}
+      year: {kind: years, start: 1950, end: 2024}
+      month: {kind: list, values: [Jan, Feb, Mar, Apr, May, Jun, Jul, Aug, Sep, Oct, Nov, Dec]}
+  - id: monthly_profile
+    complexity: filter
+    questions:
+      - "What was the month-wise rainfall in {subdivision} in {year}?"
+      - "Give me the monthly rainfall for {subdivision} for each month of {year}"
+      - "{subdivision} month by month rainfall {year}"
+    sql: >-
+      SELECT month, rainfall_mm, normal_mm FROM data.imd_subdivision_rainfall
+      WHERE subdivision = '{subdivision}' AND year = {year} AND month <> 'Annual'
+      ORDER BY CASE month
+        WHEN 'Jan' THEN 1 WHEN 'Feb' THEN 2 WHEN 'Mar' THEN 3 WHEN 'Apr' THEN 4
+        WHEN 'May' THEN 5 WHEN 'Jun' THEN 6 WHEN 'Jul' THEN 7 WHEN 'Aug' THEN 8
+        WHEN 'Sep' THEN 9 WHEN 'Oct' THEN 10 WHEN 'Nov' THEN 11 ELSE 12 END
+    params:
+      subdivision: {kind: column, source: data.imd_subdivision_rainfall.subdivision}
+      year: {kind: years, start: 1950, end: 2024}
+  - id: monsoon_total
+    complexity: group
+    questions:
+      - "How much rain did {subdivision} get during the {year} monsoon (June to September)?"
+      - "What was the total southwest monsoon rainfall in {subdivision} in {year}?"
+      - "{subdivision} monsoon rainfall {year} Jun-Sep total"
+      - "Total rainfall in {subdivision} from June to September {year}?"
+    sql: >-
+      SELECT SUM(rainfall_mm) AS monsoon_rain_mm, SUM(normal_mm) AS monsoon_normal_mm
+      FROM data.imd_subdivision_rainfall
+      WHERE subdivision = '{subdivision}' AND year = {year} AND month IN ('Jun', 'Jul', 'Aug', 'Sep')
+    params:
+      subdivision: {kind: column, source: data.imd_subdivision_rainfall.subdivision}
+      year: {kind: years, start: 1950, end: 2024}
+  - id: monthly_departure
+    complexity: derived
+    questions:
+      - "By what percentage was rainfall in {subdivision} above or below normal in {month} {year}?"
+      - "How did {month} {year} rainfall in {subdivision} compare with the long-period normal?"
+      - "{subdivision} {month} {year} rainfall departure from normal in percent"
+      - "Was {month} {year} a deficient month for {subdivision}? Give the departure from normal."
+    sql: >-
+      SELECT rainfall_mm, normal_mm,
+        ROUND((rainfall_mm - normal_mm) * 100.0 / normal_mm, 1) AS departure_pct
+      FROM data.imd_subdivision_rainfall
+      WHERE subdivision = '{subdivision}' AND year = {year} AND month = '{month}'
+    params:
+      subdivision: {kind: column, source: data.imd_subdivision_rainfall.subdivision}
+      year: {kind: years, start: 1950, end: 2024}
+      month: {kind: list, values: [Jan, Feb, Mar, Apr, May, Jun, Jul, Aug, Sep, Oct, Nov, Dec]}
+  - id: annual_departure
+    complexity: derived
+    questions:
+      - "Was {year} a wetter or drier year than normal for {subdivision}, and by what percent?"
+      - "What was the departure of {subdivision}'s annual rainfall from normal in {year}?"
+      - "{subdivision} {year} annual rainfall percent above/below normal"
+    sql: >-
+      SELECT rainfall_mm, normal_mm,
+        ROUND((rainfall_mm - normal_mm) * 100.0 / normal_mm, 1) AS departure_pct
+      FROM data.imd_subdivision_rainfall
+      WHERE subdivision = '{subdivision}' AND year = {year} AND month = 'Annual'
+    params:
+      subdivision: {kind: column, source: data.imd_subdivision_rainfall.subdivision}
+      year: {kind: years, start: 1950, end: 2024}
+  - id: monsoon_departure
+    complexity: derived
+    questions:
+      - "Was the {year} monsoon in {subdivision} above or below normal, and by how much in percent?"
+      - "How deficient or excess was the June-September {year} rainfall in {subdivision} compared with normal?"
+      - "{subdivision} monsoon {year} departure from normal percent"
+    sql: >-
+      SELECT SUM(rainfall_mm) AS monsoon_rain_mm, SUM(normal_mm) AS monsoon_normal_mm,
+        ROUND((SUM(rainfall_mm) - SUM(normal_mm)) * 100.0 / SUM(normal_mm), 1) AS departure_pct
+      FROM data.imd_subdivision_rainfall
+      WHERE subdivision = '{subdivision}' AND year = {year} AND month IN ('Jun', 'Jul', 'Aug', 'Sep')
+    params:
+      subdivision: {kind: column, source: data.imd_subdivision_rainfall.subdivision}
+      year: {kind: years, start: 1950, end: 2024}
+  - id: wettest_year_alltime
+    complexity: rank
+    questions:
+      - "Which year had the highest annual rainfall on record in {subdivision}?"
+      - "What was the wettest year ever recorded in {subdivision}?"
+      - "{subdivision} wettest year since 1901"
+    sql: >-
+      SELECT year, rainfall_mm FROM data.imd_subdivision_rainfall
+      WHERE subdivision = '{subdivision}' AND month = 'Annual' AND rainfall_mm IS NOT NULL
+      ORDER BY rainfall_mm DESC LIMIT 1
+    params:
+      subdivision: {kind: column, source: data.imd_subdivision_rainfall.subdivision}
+  - id: driest_year_alltime
+    complexity: rank
+    questions:
+      - "What was the driest year on record for {subdivision}?"
+      - "Which year had the lowest annual rainfall in {subdivision} since records began?"
+      - "{subdivision} driest year ever, IMD data"
+      - "Worst drought year in {subdivision} by total annual rainfall?"
+    sql: >-
+      SELECT year, rainfall_mm FROM data.imd_subdivision_rainfall
+      WHERE subdivision = '{subdivision}' AND month = 'Annual' AND rainfall_mm IS NOT NULL
+      ORDER BY rainfall_mm ASC LIMIT 1
+    params:
+      subdivision: {kind: column, source: data.imd_subdivision_rainfall.subdivision}
+  - id: driest_year_since
+    complexity: rank
+    questions:
+      - "Which has been the driest year in {subdivision} since {year}?"
+      - "What was the lowest annual rainfall recorded in {subdivision} from {year} onwards?"
+      - "{subdivision} driest year after {year}"
+    sql: >-
+      SELECT year, rainfall_mm FROM data.imd_subdivision_rainfall
+      WHERE subdivision = '{subdivision}' AND month = 'Annual' AND year >= {year}
+        AND rainfall_mm IS NOT NULL
+      ORDER BY rainfall_mm ASC LIMIT 1
+    params:
+      subdivision: {kind: column, source: data.imd_subdivision_rainfall.subdivision}
+      year: {kind: years, start: 1950, end: 2024}
+  - id: wettest_year_since
+    complexity: rank
+    questions:
+      - "Which year since {year} has had the most rainfall in {subdivision}?"
+      - "What was the wettest year in {subdivision} from {year} onwards?"
+      - "{subdivision} highest annual rainfall since {year}"
+    sql: >-
+      SELECT year, rainfall_mm FROM data.imd_subdivision_rainfall
+      WHERE subdivision = '{subdivision}' AND month = 'Annual' AND year >= {year}
+        AND rainfall_mm IS NOT NULL
+      ORDER BY rainfall_mm DESC LIMIT 1
+    params:
+      subdivision: {kind: column, source: data.imd_subdivision_rainfall.subdivision}
+      year: {kind: years, start: 1950, end: 2024}
+  - id: wettest_subdivision_in_year
+    complexity: rank
+    questions:
+      - "Which meteorological subdivision received the most rainfall in {year}?"
+      - "Where in India did it rain the most in {year}, by IMD subdivision?"
+      - "Wettest subdivision of India in {year}"
+    sql: >-
+      SELECT subdivision, rainfall_mm FROM data.imd_subdivision_rainfall
+      WHERE year = {year} AND month = 'Annual' AND rainfall_mm IS NOT NULL
+      ORDER BY rainfall_mm DESC LIMIT 1
+    params:
+      year: {kind: years, start: 1950, end: 2024}
+  - id: top_subdivisions_monsoon
+    complexity: rank
+    questions:
+      - "Which {n} subdivisions received the most monsoon rainfall in {year}?"
+      - "List the top {n} IMD subdivisions by June-September rainfall in {year}"
+      - "Top {n} subdivisions monsoon {year} rainfall"
+    sql: >-
+      SELECT subdivision, SUM(rainfall_mm) AS monsoon_rain_mm
+      FROM data.imd_subdivision_rainfall
+      WHERE year = {year} AND month IN ('Jun', 'Jul', 'Aug', 'Sep')
+      GROUP BY subdivision ORDER BY monsoon_rain_mm DESC LIMIT {n}
+    params:
+      year: {kind: years, start: 1950, end: 2024}
+      n: {kind: list, values: ["3", "5", "10"]}
+  - id: decade_average
+    complexity: group
+    questions:
+      - "What was the average annual rainfall in {subdivision} during the {decade}s?"
+      - "On average, how much rain did {subdivision} get per year in the decade {decade}-{decade}+9?"
+      - "{subdivision} average yearly rainfall {decade}s"
+    sql: >-
+      SELECT ROUND(AVG(rainfall_mm), 1) AS avg_annual_rain_mm, COUNT(rainfall_mm) AS years_with_data
+      FROM data.imd_subdivision_rainfall
+      WHERE subdivision = '{subdivision}' AND month = 'Annual'
+        AND year BETWEEN {decade} AND {decade} + 9
+    params:
+      subdivision: {kind: column, source: data.imd_subdivision_rainfall.subdivision}
+      decade: {kind: list, values: ["1950", "1960", "1970", "1980", "1990", "2000", "2010"]}
+  - id: annual_trend_range
+    complexity: filter
+    questions:
+      - "What was the annual rainfall in {subdivision} each year from {start} to {end}?"
+      - "Show the year-by-year rainfall trend for {subdivision} between {start} and {end}"
+      - "{subdivision} yearly rainfall {start} to {end}"
+      - "How has rainfall in {subdivision} changed from {start} to {end}, year on year?"
+    sql: >-
+      SELECT year, rainfall_mm, normal_mm FROM data.imd_subdivision_rainfall
+      WHERE subdivision = '{subdivision}' AND month = 'Annual' AND year BETWEEN {start} AND {end}
+      ORDER BY year
+    params:
+      subdivision: {kind: column, source: data.imd_subdivision_rainfall.subdivision}
+      start: {kind: years, start: 1950, end: 2010}
+      end: {kind: years, start: 2011, end: 2024}
+  - id: compare_two_subdivisions
+    complexity: join
+    questions:
+      - "Which received more rain in {year}, {a} or {b}, and by how much?"
+      - "Compare the annual rainfall of {a} and {b} in {year}"
+      - "{a} vs {b} rainfall {year}"
+    sql: >-
+      SELECT a.rainfall_mm AS a_rain_mm, b.rainfall_mm AS b_rain_mm,
+        a.rainfall_mm - b.rainfall_mm AS difference_mm
+      FROM data.imd_subdivision_rainfall a
+      JOIN data.imd_subdivision_rainfall b ON b.year = a.year AND b.month = a.month
+      WHERE a.subdivision = '{a}' AND b.subdivision = '{b}' AND a.year = {year} AND a.month = 'Annual'
+    params:
+      a: {kind: column, source: data.imd_subdivision_rainfall.subdivision, where: "subdivision < 'L'"}
+      b: {kind: column, source: data.imd_subdivision_rainfall.subdivision, where: "subdivision >= 'L'"}
+      year: {kind: years, start: 1950, end: 2024}
+  - id: years_above_normal_since
+    complexity: group
+    questions:
+      - "In how many years since {year} has {subdivision} received above-normal annual rainfall?"
+      - "How many years from {year} onwards had rainfall above the long-period normal in {subdivision}?"
+      - "{subdivision} number of above normal rainfall years since {year}"
+    sql: >-
+      SELECT COUNT(*) FILTER (WHERE rainfall_mm > normal_mm) AS years_above_normal,
+        COUNT(rainfall_mm) AS years_with_data
+      FROM data.imd_subdivision_rainfall
+      WHERE subdivision = '{subdivision}' AND month = 'Annual' AND year >= {year}
+    params:
+      subdivision: {kind: column, source: data.imd_subdivision_rainfall.subdivision}
+      year: {kind: years, start: 1950, end: 2024}

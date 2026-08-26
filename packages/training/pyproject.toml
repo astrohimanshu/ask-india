@@ -3,7 +3,23 @@ name = "askindia-training"
 version = "0.1.0"
 description = "Training-data factory, QLoRA fine-tuning, and benchmark."
 requires-python = ">=3.12,<3.13"
-dependencies = []
+dependencies = [
+    "askindia-agents",
+    "psycopg[binary]>=3.2",
+    "pyyaml>=6",
+]
+
+[project.optional-dependencies]
+train = [
+    "accelerate>=1.0",
+    "bitsandbytes>=0.44",
+    "datasets>=3.0",
+    "huggingface-hub>=0.25",
+    "peft>=0.13",
+    "torch>=2.4",
+    "transformers>=4.45",
+    "trl>=0.12",
+]
 
 [build-system]
 requires = ["hatchling"]
@@ -11,3 +27,6 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/askindia_training"]
+
+[tool.uv.sources]
+askindia-agents = { workspace = true }

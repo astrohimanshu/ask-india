@@ -55,6 +55,10 @@ packages = ["askindia_api", "askindia_agents", "askindia_ingestion", "askindia_e
 module = ["sqlglot.*", "litellm.*", "langfuse.*", "pandas.*", "pdfplumber.*", "fastembed.*", "langgraph.*", "psycopg.*", "psycopg_pool.*", "pgvector.*", "prometheus_client.*", "slowapi.*", "sse_starlette.*", "httpx.*", "yaml.*", "openpyxl.*", "xlrd.*", "camelot.*", "rank_bm25.*"]
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+module = ["askindia_training.train_qlora"]
+ignore_errors = true  # optional GPU extras (trl, peft, bitsandbytes) are untyped and version-dependent
+
 [tool.pytest.ini_options]
 testpaths = ["tests", "apps/api/tests", "packages/agents/tests", "packages/ingestion/tests", "packages/evals/tests", "packages/training/tests"]
 asyncio_mode = "auto"
