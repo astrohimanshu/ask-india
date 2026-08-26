@@ -105,6 +105,14 @@ Why things are the way they are: [docs/DECISIONS.md](docs/DECISIONS.md). What da
 what was left out: [docs/DATASETS.md](docs/DATASETS.md). How it is deployed and why the live model
 is weaker than the measured one: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
+## When a source breaks
+
+Government sources change format without notice. Ingestion runs monthly (`.github/workflows/ingest.yml`,
+self-hosted runner); a batch that fails validation is quarantined, the previous version stays
+queryable with its vintage shown on every answer, and an issue is opened with the validation
+report. The same workflow has a failure-drill input that corrupts one dataset's parsed frame on
+purpose, so the path is exercised rather than assumed.
+
 ## Observability
 
 Every graph node and model call is a Langfuse span; the API exports Prometheus metrics (request

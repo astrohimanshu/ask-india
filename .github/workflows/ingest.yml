@@ -36,7 +36,7 @@ jobs:
         run: |
           set +e
           ~/.local/bin/uv run scripts/ingest.py --only "${{ inputs.only }}" --snapshots "$HOME/projects/ask-india/data/snapshots" --report ingest-report.json | tee ingest.log
-          echo "exit=$?" >> "$GITHUB_OUTPUT"
+          echo "exit=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
           { echo "## Ingestion"; echo '```'; cat ingest.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
       - name: Re-index dictionaries
         if: steps.ingest.outputs.exit == '0'
