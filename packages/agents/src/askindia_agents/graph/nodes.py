@@ -323,7 +323,7 @@ def generate_sql(state: AgentState, deps: Deps) -> AgentState:
     attempts = state.get("attempts", 0) + 1
     errors = list(state.get("errors", []))
     user = (
-        f"Today's date: {date.today():%Y-%m-%d}\nContext:\n{state.get('context', '')}\n\n"
+        f"Today's date: {date.today():%Y-%m-%d}\nContext:\n\n\n"
         f"Question: {state['question']}"
     )
     if errors:
