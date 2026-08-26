@@ -16,7 +16,7 @@ the same questions, takes one to three minutes per answer (scale-to-zero cold st
 and — by design — refuses rather than guesses when its own answer fails the groundedness guard.
 Details in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) and [docs/EVALS.md](docs/EVALS.md).
 
-**Last updated:** 2026-08-26, 22:25 IST
+**Last updated:** 2026-08-27, 00:30 IST
 
 ![Demo: a claim the data cannot settle is refused with the dataset that would be needed; a checkable claim gets a verdict with the official figure; a question gets a chart and the SQL](docs/demo.gif)
 
@@ -53,6 +53,10 @@ Two harnesses run against the real stack and gate every merge ([details](docs/EV
 - **L2 verdict accuracy** — 90 labelled claims, 60 of them generated from the data itself and
   mutated into Supported / Misleading / Contradicted. **83.3 %** overall; **93 % recall on
   Unverifiable**, the class that matters most.
+- **Fine-tuning, measured honestly** — a QLoRA adapter trained on 484 execution-verified pairs
+  beats the prompted base model on held-out templates (35.0 % vs 31.7 %) and is a third faster,
+  but loses on hand-written questions (75.0 % vs 80.0 %). It is not the default, and
+  [the table says so](docs/EVALS.md#p17--does-a-fine-tuned-small-model-beat-prompting-2026-08-26).
 
 ## Checking a claim
 

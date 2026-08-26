@@ -72,13 +72,111 @@ def run_model(model: str, sets: dict[str, list[dict[str, Any]]]) -> dict[str, An
     return out
 
 
+def write_figure(path: Path, rows: list[dict[str, Any]], stamp: str, chat_model: str) -> None:
+    """Grouped bars: each model on both held-out sets, prompted baselines drawn as lines."""
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    plt.rcParams.update(
+        {
+            "axes.labelsize": 12,
+            "xtick.labelsize": 10,
+            "ytick.labelsize": 10,
+            "legend.fontsize": 10,
+            "axes.titlesize": 13,
+        }
+    )
+    labels = [r["model"].replace("ollama/", "") for r in rows]
+    gold = [r["gold60_accuracy_pct"] for r in rows]
+    tmpl = [r["template_test_accuracy_pct"] for r in rows]
+    x = range(len(rows))
+    width = 0.38
+    fig, ax = plt.subplots(figsize=(9, 5.5), layout="constrained")
+    b1 = ax.bar(
+        [i - width / 2 for i in x],
+        gold,
+        width,
+        color="#e0812f",
+        label="Hand-written gold set (60 questions)",
+    )
+    b2 = ax.bar(
+        [i + width / 2 for i in x],
+        tmpl,
+        width,
+        color="#3d6b9e",
+        label="Held-out templates (60 questions)",
+    )
+    for bars in (b1, b2):
+        for bar in bars:
+            ax.annotate(
+                f"{bar.get_height():.1f}%",
+                (bar.get_x() + bar.get_width() / 2, bar.get_height() + 1.2),
+                ha="center",
+                va="bottom",
+                fontsize=10,
+            )
+    base = rows[0]
+    ax.axhline(base["gold60_accuracy_pct"], color="#8a4a12", linestyle="--", linewidth=1.1)
+    ax.annotate(
+        f"prompted 7B baseline, gold set: {base['gold60_accuracy_pct']:.1f}%",
+        (0.01, base["gold60_accuracy_pct"] + 1.5),
+        xycoords=("axes fraction", "data"),
+        ha="left",
+        fontsize=10,
+        bbox={"facecolor": "white", "edgecolor": "none", "pad": 1.5},
+    )
+    ax.axhline(base["template_test_accuracy_pct"], color="#26496f", linestyle=":", linewidth=1.1)
+    ax.annotate(
+        f"prompted 7B baseline, templates: {base['template_test_accuracy_pct']:.1f}%",
+        (0.01, base["template_test_accuracy_pct"] + 1.5),
+        xycoords=("axes fraction", "data"),
+        ha="left",
+        fontsize=10,
+        bbox={"facecolor": "white", "edgecolor": "none", "pad": 1.5},
+    )
+    ax.set_xticks(list(x), labels)
+    ax.set_ylim(0, 105)
+    ax.set_xlabel(
+        "SQL-generation model (same chat model for intake and composition: " + chat_model + ")"
+    )
+    ax.set_ylabel("Execution accuracy (% of questions returning rows equivalent to the gold rows)")
+    ax.set_title(f"NL-to-SQL execution accuracy on two held-out sets — {stamp}")
+    ax.legend(loc="upper right")
+    fig.savefig(path, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--models", required=True, help="comma-separated LiteLLM model ids")
     parser.add_argument("--pairs", default="results/training/pairs.jsonl")
     parser.add_argument("--template-test-limit", type=int, default=60)
     parser.add_argument("--out", default="results/benchmarks/p17")
+    parser.add_argument("--replot", default="", help="regenerate the figure from an existing CSV")
     args = parser.parse_args()
+    if args.replot:
+        with open(args.replot) as f:
+            csv_rows = [
+                {
+                    k: (float(v) if k.endswith(("_pct", "_s")) or k.startswith("mean") else v)
+                    for k, v in r.items()
+                }
+                for r in csv.DictReader(f)
+            ]
+        stamp_from_name = Path(args.replot).stem.split("_")[-2:]
+        stamp = "_".join(stamp_from_name)
+        fig_dir = Path(args.out).parent.parent / "figures" / "p17"
+        fig_dir.mkdir(parents=True, exist_ok=True)
+        write_figure(
+            fig_dir / f"fig03_p17-sql-model-accuracy_{stamp}.png",
+            csv_rows,
+            stamp,
+            os.environ.get("CHAT_MODEL", "qwen2.5:7b-instruct"),
+        )
+        print(f"wrote {fig_dir}/fig03_p17-sql-model-accuracy_{stamp}.png")
+        return 0
     stamp = datetime.now().strftime("%Y-%m-%d_%H%M")
     sets = {
         "gold60": load_gold(),
@@ -134,6 +232,14 @@ def main() -> int:
         "Cost: all models run on the same local GPU; "
         "per-query cost is the p50 latency in GPU-seconds.",
     ]
+    fig_dir = out.parent.parent / "figures" / "p17"
+    fig_dir.mkdir(parents=True, exist_ok=True)
+    write_figure(
+        fig_dir / f"fig03_p17-sql-model-accuracy_{stamp}.png",
+        rows,
+        stamp,
+        str(os.environ.get("CHAT_MODEL")),
+    )
     (out / f"summary_p17_{stamp}.md").write_text("\n".join(lines) + "\n")
     print("\n".join(lines))
     return 0

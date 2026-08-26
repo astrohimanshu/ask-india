@@ -1,0 +1,4 @@
+model,gold60_accuracy_pct,template_test_accuracy_pct,template_test_n,answered_pct_gold60,mean_attempts_gold60,p50_s,p95_s
+ollama/qwen2.5-coder:7b,80.0,31.7,60,90.0,1.2,12.0,19.8
+ollama/askindia-lora,75.0,35.0,60,90.0,1.15,8.1,14.2
+ollama/qwen2.5-coder:3b,53.3,18.3,60,76.7,1.32,8.9,16.2

@@ -67,3 +67,49 @@ uv run scripts/check_gold.py                 # every gold query executes
 uv run python -m askindia_evals.l1           # writes results/evals/l1 + results/figures/l1
 uv run python -m askindia_evals.l2           # writes results/evals/l2 + results/figures/l2
 ```
+
+## P17 — does a fine-tuned small model beat prompting? (2026-08-26)
+
+A LoRA adapter (r=16, QLoRA on a 4-bit Qwen2.5-Coder-7B-Instruct, 484 execution-verified training
+pairs, 2 epochs, 15 minutes on one RTX 4500) is compared with the prompted base model and with the
+3B model that runs in production. Only the SQL-generation model changes between rows: intake and
+composition use `qwen2.5:7b-instruct` throughout, and the scorer is the same result-equivalence
+check used everywhere else.
+
+Two held-out sets, because they measure different things:
+
+- **Hand-written gold set (60)** — the L1 questions, written by hand before any training data
+  existed. No template that produced training data resembles them.
+- **Held-out templates (60)** — questions from templates whose *entire* family was excluded from
+  training, phrased tersely ("Airport with maximum domestic passengers in 2026-02?"). This is the
+  in-domain generalisation test.
+
+| model | gold set (60) | held-out templates (60) | answered | attempts | p50 | p95 |
+|---|---|---|---|---|---|---|
+| prompted `qwen2.5-coder:7b` | **80.0 %** | 31.7 % | 90.0 % | 1.20 | 12.0 s | 19.8 s |
+| **LoRA** `askindia-lora` (7B) | 75.0 % | **35.0 %** | 90.0 % | 1.15 | **8.1 s** | **14.2 s** |
+| prompted `qwen2.5-coder:3b` (production) | 53.3 % | 18.3 % | 76.7 % | 1.32 | 8.9 s | 16.2 s |
+
+![Execution accuracy by model on both held-out sets](figures/p17-sql-model-accuracy.png)
+
+**The LoRA does not win outright, and the table ships as it is.** It is 5 points *worse* on the
+hand-written gold set and 3.3 points *better* on held-out templates, while cutting median latency
+by a third (8.1 s vs 12.0 s) because it emits the JSON contract without preamble. The honest
+reading: 484 pairs from 69 templates taught the model this schema's idioms and this output shape,
+but the templates are narrower than the questions a person actually asks, so on hand-written
+phrasing the adapter has traded a little generality for a lot of speed. Fine-tuning is not
+carrying its weight yet at this data scale, and the production default stays the prompted model.
+
+What would change the verdict, in the order I would try it: more phrasing diversity per template
+(an LLM paraphrase pass, currently not implemented); training pairs harvested from real L1
+failures rather than only from templates; and a larger held-out set so a 3-point gap is more than
+noise — at n=60, a 5-point difference is about three questions.
+
+Reproduce:
+
+```bash
+uv run python -m askindia_training.build_dataset --out results/training/pairs.jsonl
+uv run --extra train python -m askindia_training.train_qlora --pairs results/training/pairs.jsonl --out results/training/adapter-v1
+bash packages/training/src/askindia_training/register_adapter.sh results/training/adapter-v1/final askindia-lora
+uv run python -m askindia_training.benchmark --models ollama/qwen2.5-coder:7b,ollama/askindia-lora,ollama/qwen2.5-coder:3b
+```
