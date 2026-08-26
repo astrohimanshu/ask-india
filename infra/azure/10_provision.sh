@@ -8,23 +8,26 @@ cd "$(dirname "$0")"; . ./00_vars.sh
 
 az provider register -n Microsoft.DBforPostgreSQL --wait >/dev/null
 az provider register -n Microsoft.App --wait >/dev/null
-az group create -n "$AZ_RG" -l "$AZ_LOCATION" -o none
+az group show -n "$AZ_RG" -o none 2>/dev/null || az group create -n "$AZ_RG" -l "$AZ_LOCATION" -o none
 
-az monitor log-analytics workspace create -g "$AZ_RG" -n "$AZ_LOGS" -l "$AZ_LOCATION" -o none
-LOG_ID=$(az monitor log-analytics workspace show -g "$AZ_RG" -n "$AZ_LOGS" --query customerId -o tsv)
-LOG_KEY=$(az monitor log-analytics workspace get-shared-keys -g "$AZ_RG" -n "$AZ_LOGS" --query primarySharedKey -o tsv)
-az containerapp env show -g "$AZ_RG" -n "$AZ_ENV" -o none 2>/dev/null || \
-  az containerapp env create -g "$AZ_RG" -n "$AZ_ENV" -l "$AZ_LOCATION" \
-    --logs-workspace-id "$LOG_ID" --logs-workspace-key "$LOG_KEY" -o none
+if [ -z "$AZ_ENV_ID" ]; then
+  az monitor log-analytics workspace create -g "$AZ_RG" -n "$AZ_LOGS" -l "$AZ_LOCATION" -o none
+  LOG_ID=$(az monitor log-analytics workspace show -g "$AZ_RG" -n "$AZ_LOGS" --query customerId -o tsv)
+  LOG_KEY=$(az monitor log-analytics workspace get-shared-keys -g "$AZ_RG" -n "$AZ_LOGS" --query primarySharedKey -o tsv)
+  az containerapp env show -g "$AZ_RG" -n "$AZ_ENV" -o none 2>/dev/null || \
+    az containerapp env create -g "$AZ_RG" -n "$AZ_ENV" -l "$AZ_LOCATION" \
+      --logs-workspace-id "$LOG_ID" --logs-workspace-key "$LOG_KEY" -o none
+fi
 
-az identity create -g "$AZ_RG" -n "$AZ_IDENTITY" -o none
+az identity create -g "$AZ_RG" -n "$AZ_IDENTITY" -l "$AZ_LOCATION" -o none
 
 if ! az postgres flexible-server show -g "$AZ_RG" -n "$AZ_PG" -o none 2>/dev/null; then
   az postgres flexible-server create -g "$AZ_RG" -n "$AZ_PG" -l "$AZ_LOCATION" \
     --tier Burstable --sku-name Standard_B1ms --storage-size 32 --version 16 \
     --admin-user "$AZ_PG_ADMIN" --admin-password "$PG_ADMIN_PASSWORD" \
-    --database-name askindia --public-access 0.0.0.0 --yes -o none
+    --public-access 0.0.0.0 --yes -o none
 fi
+az postgres flexible-server db create -g "$AZ_RG" -s "$AZ_PG" -d askindia -o none 2>/dev/null || true
 az postgres flexible-server parameter set -g "$AZ_RG" -s "$AZ_PG" -n azure.extensions --value vector -o none
 az postgres flexible-server parameter set -g "$AZ_RG" -s "$AZ_PG" -n shared_preload_libraries --value pg_stat_statements -o none || true
 

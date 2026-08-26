@@ -177,16 +177,43 @@ def triage(state: AgentState, deps: Deps) -> AgentState:
                 "data_needed": "a clearer statement of the claim",
             },
         }
-    known = {
-        line[2:].split(":", 1)[0] for line in deps.manifest().splitlines() if line.startswith("- ")
-    }
+    manifest = deps.manifest()
+    known = {line[2:].split(":", 1)[0] for line in manifest.splitlines() if line.startswith("- ")}
     result = decision.model_dump()
     if decision.triage == "checkable" and known and decision.dataset not in known:
         result["triage"] = "statistical_uncovered"
         result["reason"] = (
             f"{result['reason']} (named dataset {decision.dataset!r} is not in the catalogue)"
         )
+    outside = years_outside_coverage(state["question"], result.get("dataset"), manifest)
+    if result["triage"] == "checkable" and outside:
+        years = ", ".join(map(str, outside))
+        result["triage"] = "statistical_uncovered"
+        result["reason"] = (
+            f"the claim refers to {years}, outside the coverage of {result['dataset']}"
+        )
+        result["data_needed"] = f"{result['dataset']} extended to cover {years}"
     return {"claim": state["question"], "triage": result}
+
+
+_YEAR = re.compile(r"\b(19[0-9]{2}|20[0-9]{2})\b")
+_COVERAGE = re.compile(r"\((\d{4})-\d{2}-\d{2} to (\d{4})-\d{2}-\d{2}\)")
+
+
+def years_outside_coverage(claim: str, dataset: str | None, manifest: str) -> list[int]:
+    """Years the claim mentions that fall outside the named dataset's coverage span."""
+    if not dataset:
+        return []
+    for line in manifest.splitlines():
+        if line.startswith(f"- {dataset}:"):
+            m = _COVERAGE.search(line)
+            if not m:
+                return []
+            lo, hi = int(m.group(1)), int(m.group(2))
+            years = {int(y) for y in _YEAR.findall(claim)}
+            # a crop year like 2023-24 mentions 2023; allow the following year for spans
+            return sorted(y for y in years if y < lo or y > hi + 1)
+    return []
 
 
 def route_after_triage(state: AgentState) -> str:

@@ -22,38 +22,18 @@ ASKINDIA_APP_PASSWORD=${ASKINDIA_APP_PASSWORD}
 ASKINDIA_RO_PASSWORD=${ASKINDIA_RO_PASSWORD}
 DATABASE_URL=postgresql://askindia_app:${ASKINDIA_APP_PASSWORD}@db:5432/askindia
 DATABASE_URL_RO=postgresql://askindia_ro:${ASKINDIA_RO_PASSWORD}@db:5432/askindia
-LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY:-}
-LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY:-}
+LANGFUSE_PUBLIC_KEY=
+LANGFUSE_SECRET_KEY=
 ENV
 
 # The host's Ollama listens on 127.0.0.1 only; expose it to the kind network on the docker bridge
-# IPv4 gateway with a small forwarder, and give pods a stable name for it through a selector-less
-# Service.
+# IPv4 gateway with a small forwarder and hand pods that address through the config map.
 GATEWAY=$(docker network inspect kind | python3 -c 'import sys,json; print(next(c["Gateway"] for c in json.load(sys.stdin)[0]["IPAM"]["Config"] if ":" not in c["Subnet"]))')
 if ! ss -ltn | grep -q "${GATEWAY}:11434"; then
   nohup uv run scripts/tcp_forward.py "$GATEWAY" 11434 127.0.0.1 11434 >/dev/null 2>&1 &
   sleep 2
 fi
-cat > infra/k8s/overlays/kind/host-ollama.yaml <<YAML
-apiVersion: v1
-kind: Service
-metadata:
-  name: ollama
-spec:
-  ports:
-    - port: 11434
-      targetPort: 11434
----
-apiVersion: v1
-kind: Endpoints
-metadata:
-  name: ollama
-subsets:
-  - addresses:
-      - ip: ${GATEWAY}
-    ports:
-      - port: 11434
-YAML
+echo "OLLAMA_BASE_URL=http://${GATEWAY}:11434" > infra/k8s/overlays/kind/ollama.env
 
 # The overlay reads the init SQL from scripts/db, outside its directory, so load restrictions are relaxed.
 kubectl kustomize --load-restrictor LoadRestrictionsNone infra/k8s/overlays/kind | kubectl apply -f -

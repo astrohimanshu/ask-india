@@ -5,6 +5,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"; . ./00_vars.sh
 ID_RES=$(az identity show -g "$AZ_RG" -n "$AZ_IDENTITY" --query id -o tsv)
+ENV_REF="${AZ_ENV_ID:-$AZ_ENV}"
 secret() { az keyvault secret show --vault-name "$AZ_KV" -n "$1" --query value -o tsv; }
 DB_URL=$(secret DATABASE-URL); DB_URL_RO=$(secret DATABASE-URL-RO)
 LF_PK=$(secret LANGFUSE-PUBLIC-KEY); LF_SK=$(secret LANGFUSE-SECRET-KEY)
@@ -15,7 +16,7 @@ upsert() { # name image ingress(external|internal) port cpu memory min max [extr
     az containerapp update -g "$AZ_RG" -n "$name" --image "$image" --cpu "$cpu" --memory "$mem" \
       --min-replicas "$min" --max-replicas "$max" "$@" -o none
   else
-    az containerapp create -g "$AZ_RG" -n "$name" --environment "$AZ_ENV" --image "$image" \
+    az containerapp create -g "$AZ_RG" -n "$name" --environment "$ENV_REF" --image "$image" \
       --ingress "$ingress" --target-port "$port" --cpu "$cpu" --memory "$mem" \
       --min-replicas "$min" --max-replicas "$max" --user-assigned "$ID_RES" "$@" -o none
   fi

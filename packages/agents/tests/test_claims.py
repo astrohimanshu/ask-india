@@ -242,3 +242,25 @@ def test_decomposition_tolerates_null_comparison_and_scale() -> None:
         {"question": "how much?", "claimed_value": 4000, "comparison": None, "scale": None}
     )
     assert d.comparison == "value" and d.scale == 1.0
+
+
+def test_claim_year_outside_coverage_is_unverifiable() -> None:
+    from askindia_agents.graph.nodes import years_outside_coverage
+
+    manifest = "- aai_airport_traffic: AAI airport traffic (2023-01-01 to 2026-06-01)"
+    assert years_outside_coverage(
+        "Delhi airport handled 70 million passengers in 2019", "aai_airport_traffic", manifest
+    ) == [2019]
+    assert (
+        years_outside_coverage(
+            "Delhi handled 6 million in June 2025", "aai_airport_traffic", manifest
+        )
+        == []
+    )
+    llm = ScriptedLLM(
+        [{"triage": "checkable", "dataset": "census_2011_pca", "reason": "population"}]
+    )
+    d = deps(llm)
+    d.manifest = lambda: "- census_2011_pca: Census 2011 (2011-03-01 to 2011-03-01)"
+    final = build_graph(d).invoke({"question": "Bihar had 13 crore people in 2023"})["final"]
+    assert final["status"] == "unverifiable" and "2023" in final["prose"]
