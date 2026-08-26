@@ -108,7 +108,10 @@ def main() -> int:
     (out / f"bench01_p17-predictions_{stamp}.json").write_text(
         json.dumps(results, indent=2, default=str)
     )
-    header = "| model | gold-60 exec acc | template-test exec acc | answered | attempts | p50 s | p95 s |"
+    header = (
+        "| model | gold-60 exec acc | template-test exec acc "
+        "| answered | attempts | p50 s | p95 s |"
+    )
     lines = [
         f"P17 SQL-generation benchmark — {stamp} (chat model {os.environ.get('CHAT_MODEL')})",
         "",
@@ -128,7 +131,8 @@ def main() -> int:
         lines.append("| " + " | ".join(cells) + " |")
     lines += [
         "",
-        "Cost: all models run on the same local GPU; per-query cost is the p50 latency in GPU-seconds.",
+        "Cost: all models run on the same local GPU; "
+        "per-query cost is the p50 latency in GPU-seconds.",
     ]
     (out / f"summary_p17_{stamp}.md").write_text("\n".join(lines) + "\n")
     print("\n".join(lines))
