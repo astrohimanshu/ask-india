@@ -1,0 +1,145 @@
+dataset: crop_production
+templates:
+  - id: india_production
+    complexity: filter
+    questions:
+      - "How much {crop} did India produce in {crop_year}?"
+      - "India's {crop} production in {crop_year}, in thousand tonnes"
+      - "{crop} output of India, crop year {crop_year}"
+    sql: >-
+      SELECT production_thousand_tonnes, estimate_type FROM data.crop_production
+      WHERE crop = '{crop}' AND state = 'All India' AND crop_year = '{crop_year}'
+        AND (season = 'Total' OR NOT EXISTS (SELECT 1 FROM data.crop_production c2
+             WHERE c2.crop = '{crop}' AND c2.state = 'All India' AND c2.crop_year = '{crop_year}' AND c2.season = 'Total'))
+    params:
+      crop: {kind: column, source: data.crop_production.crop, where: "state = 'All India'"}
+      crop_year: {kind: list, values: ["2021-22", "2022-23", "2023-24", "2024-25", "2025-26"]}
+  - id: state_production
+    complexity: filter
+    questions:
+      - "How much {crop} did {state} produce in {crop_year}?"
+      - "{state} {crop} production, {crop_year}"
+    sql: >-
+      SELECT production_thousand_tonnes, season FROM data.crop_production
+      WHERE crop = '{crop}' AND state = '{state}' AND crop_year = '{crop_year}'
+        AND (season = 'Total' OR NOT EXISTS (SELECT 1 FROM data.crop_production c2
+             WHERE c2.crop = '{crop}' AND c2.state = '{state}' AND c2.crop_year = '{crop_year}' AND c2.season = 'Total'))
+    params:
+      crop: {kind: list, values: [Rice, Wheat, Maize, Sugarcane, Cotton, Gram, Tur, Soybean, Groundnut, Bajra]}
+      state: {kind: list, values: [Punjab, Haryana, "Uttar Pradesh", "Madhya Pradesh", Maharashtra, Karnataka, "Tamil Nadu", "West Bengal", Gujarat, Rajasthan, "Andhra Pradesh", Bihar]}
+      crop_year: {kind: list, values: ["2021-22", "2022-23", "2023-24", "2024-25"]}
+  - id: top_states_crop
+    complexity: rank
+    questions:
+      - "Which state produced the most {crop} in {crop_year}?"
+      - "Largest {crop} producing state in {crop_year}"
+    sql: >-
+      SELECT state, production_thousand_tonnes FROM data.crop_production
+      WHERE crop = '{crop}' AND crop_year = '{crop_year}' AND state <> 'All India'
+        AND (season = 'Total' OR NOT EXISTS (SELECT 1 FROM data.crop_production c2
+             WHERE c2.crop = '{crop}' AND c2.crop_year = '{crop_year}' AND c2.season = 'Total'))
+      ORDER BY production_thousand_tonnes DESC NULLS LAST LIMIT 1
+    params:
+      crop: {kind: column, source: data.crop_production.crop, where: "state = 'All India'"}
+      crop_year: {kind: list, values: ["2021-22", "2022-23", "2023-24", "2024-25"]}
+  - id: top_n_states_crop
+    complexity: rank
+    questions:
+      - "Top {n} {crop} producing states in {crop_year}"
+      - "Which {n} states grew the most {crop} in {crop_year}?"
+    sql: >-
+      SELECT state, production_thousand_tonnes FROM data.crop_production
+      WHERE crop = '{crop}' AND crop_year = '{crop_year}' AND state <> 'All India'
+        AND (season = 'Total' OR NOT EXISTS (SELECT 1 FROM data.crop_production c2
+             WHERE c2.crop = '{crop}' AND c2.crop_year = '{crop_year}' AND c2.season = 'Total'))
+      ORDER BY production_thousand_tonnes DESC NULLS LAST LIMIT {n}
+    params:
+      n: {kind: list, values: ["3", "5"]}
+      crop: {kind: list, values: [Rice, Wheat, Maize, Sugarcane, Cotton, Gram, Soybean, Groundnut, "Total Pulses", "Total Food Grains"]}
+      crop_year: {kind: list, values: ["2021-22", "2022-23", "2023-24", "2024-25"]}
+  - id: state_yield
+    complexity: filter
+    questions:
+      - "What was the {crop} yield in {state} in {crop_year}?"
+      - "{crop} yield per hectare in {state}, {crop_year}"
+    sql: >-
+      SELECT yield_kg_per_ha FROM data.crop_production
+      WHERE crop = '{crop}' AND state = '{state}' AND crop_year = '{crop_year}' AND yield_kg_per_ha IS NOT NULL
+        AND (season = 'Total' OR NOT EXISTS (SELECT 1 FROM data.crop_production c2
+             WHERE c2.crop = '{crop}' AND c2.state = '{state}' AND c2.crop_year = '{crop_year}' AND c2.season = 'Total'))
+    params:
+      crop: {kind: list, values: [Rice, Wheat, Maize, Sugarcane, Cotton, Gram, Soybean, Groundnut]}
+      state: {kind: list, values: [Punjab, Haryana, "Uttar Pradesh", "Madhya Pradesh", Maharashtra, Karnataka, "Tamil Nadu", "West Bengal", Gujarat, Rajasthan, Bihar]}
+      crop_year: {kind: list, values: ["2021-22", "2022-23", "2023-24", "2024-25"]}
+  - id: yield_vs_india
+    complexity: group
+    questions:
+      - "How does {state}'s {crop} yield in {crop_year} compare with the all-India average?"
+      - "{crop} yield: {state} versus India, {crop_year}"
+    sql: >-
+      SELECT state, yield_kg_per_ha FROM data.crop_production
+      WHERE crop = '{crop}' AND crop_year = '{crop_year}' AND (state = '{state}' OR state = 'All India')
+        AND yield_kg_per_ha IS NOT NULL
+        AND (season = 'Total' OR NOT EXISTS (SELECT 1 FROM data.crop_production c2
+             WHERE c2.crop = '{crop}' AND c2.crop_year = '{crop_year}' AND c2.season = 'Total'))
+      ORDER BY state
+    params:
+      crop: {kind: list, values: [Rice, Wheat, Maize, Gram, Soybean, Groundnut, Cotton]}
+      state: {kind: list, values: [Punjab, Haryana, "Uttar Pradesh", "Madhya Pradesh", Maharashtra, Karnataka, "Tamil Nadu", "West Bengal", Gujarat, Bihar]}
+      crop_year: {kind: list, values: ["2021-22", "2022-23", "2023-24", "2024-25"]}
+  - id: india_trend
+    complexity: group
+    questions:
+      - "How has India's {crop} production changed year by year since 2021-22?"
+      - "{crop} production in India across the last five crop years"
+    sql: >-
+      SELECT crop_year, production_thousand_tonnes, estimate_type FROM data.crop_production
+      WHERE crop = '{crop}' AND state = 'All India'
+        AND (season = 'Total' OR NOT EXISTS (SELECT 1 FROM data.crop_production c2
+             WHERE c2.crop = '{crop}' AND c2.state = 'All India' AND c2.season = 'Total'))
+      ORDER BY crop_year
+    params:
+      crop: {kind: column, source: data.crop_production.crop, where: "state = 'All India'"}
+  - id: india_change_pct
+    complexity: derived
+    questions:
+      - "By what percentage did India's {crop} production change from {year1} to {year2}?"
+      - "Percent change in India's {crop} output between {year1} and {year2}"
+    sql: >-
+      SELECT ROUND((MAX(CASE WHEN crop_year = '{year2}' THEN production_thousand_tonnes END)
+                  - MAX(CASE WHEN crop_year = '{year1}' THEN production_thousand_tonnes END)) * 100.0
+                  / MAX(CASE WHEN crop_year = '{year1}' THEN production_thousand_tonnes END), 2) AS change_pct
+      FROM data.crop_production WHERE crop = '{crop}' AND state = 'All India'
+        AND (season = 'Total' OR NOT EXISTS (SELECT 1 FROM data.crop_production c2
+             WHERE c2.crop = '{crop}' AND c2.state = 'All India' AND c2.season = 'Total'))
+    params:
+      crop: {kind: list, values: [Rice, Wheat, Maize, Sugarcane, Cotton, Gram, Soybean, "Total Pulses", "Total Food Grains", "Total Oil Seeds"]}
+      year1: {kind: list, values: ["2021-22", "2022-23"]}
+      year2: {kind: list, values: ["2023-24", "2024-25"]}
+  - id: season_production
+    complexity: filter
+    questions:
+      - "How much {crop} did {state} grow in the {season} season of {crop_year}?"
+      - "{season} {crop} production in {state}, {crop_year}"
+    sql: >-
+      SELECT production_thousand_tonnes, area_thousand_ha FROM data.crop_production
+      WHERE crop = '{crop}' AND state = '{state}' AND season = '{season}' AND crop_year = '{crop_year}'
+    params:
+      crop: {kind: list, values: [Rice, Maize, Groundnut, Moong, Urad, Bajra, Jowar]}
+      state: {kind: list, values: [Karnataka, "Andhra Pradesh", "Tamil Nadu", "West Bengal", "Uttar Pradesh", Maharashtra, Gujarat, Rajasthan, Bihar, Telangana]}
+      season: {kind: list, values: [Kharif, Rabi]}
+      crop_year: {kind: list, values: ["2021-22", "2022-23", "2023-24", "2024-25"]}
+  - id: area_under_crop
+    complexity: filter
+    questions:
+      - "What was the area under {crop} in {state} in {crop_year}?"
+      - "{state} {crop} acreage, {crop_year} (thousand hectares)"
+    sql: >-
+      SELECT area_thousand_ha FROM data.crop_production
+      WHERE crop = '{crop}' AND state = '{state}' AND crop_year = '{crop_year}' AND area_thousand_ha IS NOT NULL
+        AND (season = 'Total' OR NOT EXISTS (SELECT 1 FROM data.crop_production c2
+             WHERE c2.crop = '{crop}' AND c2.state = '{state}' AND c2.crop_year = '{crop_year}' AND c2.season = 'Total'))
+    params:
+      crop: {kind: list, values: [Rice, Wheat, Cotton, Sugarcane, Soybean, Gram, Maize]}
+      state: {kind: list, values: [Punjab, Haryana, "Uttar Pradesh", "Madhya Pradesh", Maharashtra, Gujarat, Rajasthan, Karnataka, Bihar]}
+      crop_year: {kind: list, values: ["2021-22", "2022-23", "2023-24", "2024-25"]}

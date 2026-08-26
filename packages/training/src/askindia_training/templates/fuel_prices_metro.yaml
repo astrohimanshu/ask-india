@@ -1,0 +1,121 @@
+dataset: fuel_prices_metro
+templates:
+  - id: price_on_date
+    complexity: filter
+    questions:
+      - "What was the {fuel} price in {city} on {date}?"
+      - "How much did {fuel} cost per litre in {city} on {date}?"
+      - "{city} {fuel} rate on {date}"
+    sql: >-
+      SELECT price_inr_per_litre FROM data.fuel_prices_metro
+      WHERE city = '{city}' AND fuel = '{fuel}' AND price_date = '{date}'
+    params:
+      city: {kind: list, values: [Delhi, Mumbai, Chennai, Kolkata]}
+      fuel: {kind: list, values: [petrol, diesel]}
+      date: {kind: column, source: data.fuel_prices_metro.price_date, where: "price_date >= '2018-01-01'"}
+  - id: latest_price
+    complexity: rank
+    questions:
+      - "What is the latest {fuel} price in {city}?"
+      - "Current {fuel} price in {city} according to the data"
+    sql: >-
+      SELECT price_date, price_inr_per_litre FROM data.fuel_prices_metro
+      WHERE city = '{city}' AND fuel = '{fuel}' ORDER BY price_date DESC LIMIT 1
+    params:
+      city: {kind: list, values: [Delhi, Mumbai, Chennai, Kolkata]}
+      fuel: {kind: list, values: [petrol, diesel]}
+  - id: yearly_average
+    complexity: group
+    questions:
+      - "What was the average {fuel} price in {city} in {year}?"
+      - "Average per-litre {fuel} price, {city}, {year}"
+    sql: >-
+      SELECT ROUND(AVG(price_inr_per_litre), 2) AS avg_price FROM data.fuel_prices_metro
+      WHERE city = '{city}' AND fuel = '{fuel}' AND price_date BETWEEN '{year}-01-01' AND '{year}-12-31'
+    params:
+      city: {kind: list, values: [Delhi, Mumbai, Chennai, Kolkata]}
+      fuel: {kind: list, values: [petrol, diesel]}
+      year: {kind: years, start: 2018, end: 2025}
+  - id: yearly_trend
+    complexity: group
+    questions:
+      - "How did the average {fuel} price in {city} change year by year?"
+      - "Year-wise average {fuel} price in {city}"
+    sql: >-
+      SELECT EXTRACT(YEAR FROM price_date)::int AS year, ROUND(AVG(price_inr_per_litre), 2) AS avg_price
+      FROM data.fuel_prices_metro WHERE city = '{city}' AND fuel = '{fuel}' GROUP BY 1 ORDER BY 1
+    params:
+      city: {kind: list, values: [Delhi, Mumbai, Chennai, Kolkata]}
+      fuel: {kind: list, values: [petrol, diesel]}
+  - id: peak_price
+    complexity: rank
+    questions:
+      - "When was {fuel} most expensive in {city}, and at what price?"
+      - "Highest ever {fuel} price in {city}"
+    sql: >-
+      SELECT price_date, price_inr_per_litre FROM data.fuel_prices_metro
+      WHERE city = '{city}' AND fuel = '{fuel}' ORDER BY price_inr_per_litre DESC, price_date LIMIT 1
+    params:
+      city: {kind: list, values: [Delhi, Mumbai, Chennai, Kolkata]}
+      fuel: {kind: list, values: [petrol, diesel]}
+  - id: cheapest_city_on_date
+    complexity: rank
+    questions:
+      - "Which metro city had the cheapest {fuel} on {date}?"
+      - "Cheapest {fuel} among the four metros on {date}"
+    sql: >-
+      SELECT city, price_inr_per_litre FROM data.fuel_prices_metro
+      WHERE fuel = '{fuel}' AND price_date = '{date}' ORDER BY price_inr_per_litre ASC LIMIT 1
+    params:
+      fuel: {kind: list, values: [petrol, diesel]}
+      date: {kind: column, source: data.fuel_prices_metro.price_date, where: "price_date >= '2018-01-01'"}
+  - id: change_between_dates
+    complexity: derived
+    questions:
+      - "By how much did the {fuel} price in {city} change between {date1} and {date2}?"
+      - "{city} {fuel}: difference in price from {date1} to {date2}"
+    sql: >-
+      SELECT MAX(CASE WHEN price_date = '{date2}' THEN price_inr_per_litre END)
+           - MAX(CASE WHEN price_date = '{date1}' THEN price_inr_per_litre END) AS change_inr
+      FROM data.fuel_prices_metro WHERE city = '{city}' AND fuel = '{fuel}'
+    params:
+      city: {kind: list, values: [Delhi, Mumbai, Chennai, Kolkata]}
+      fuel: {kind: list, values: [petrol, diesel]}
+      date1: {kind: list, values: ["2017-06-16", "2018-01-01", "2019-01-01", "2020-01-01", "2021-01-01"]}
+      date2: {kind: list, values: ["2022-01-01", "2023-01-01", "2024-01-01", "2025-01-01", "2026-01-01"]}
+  - id: petrol_diesel_gap
+    complexity: derived
+    questions:
+      - "How much more expensive was petrol than diesel in {city} on {date}?"
+      - "Petrol minus diesel price in {city} on {date}"
+    sql: >-
+      SELECT MAX(CASE WHEN fuel = 'petrol' THEN price_inr_per_litre END)
+           - MAX(CASE WHEN fuel = 'diesel' THEN price_inr_per_litre END) AS gap_inr
+      FROM data.fuel_prices_metro WHERE city = '{city}' AND price_date = '{date}'
+    params:
+      city: {kind: list, values: [Delhi, Mumbai, Chennai, Kolkata]}
+      date: {kind: column, source: data.fuel_prices_metro.price_date, where: "price_date >= '2018-01-01'"}
+  - id: max_by_city_in_year
+    complexity: group
+    questions:
+      - "What was the highest {fuel} price in each metro city during {year}?"
+      - "Peak {fuel} price per city in {year}"
+    sql: >-
+      SELECT city, MAX(price_inr_per_litre) AS max_price FROM data.fuel_prices_metro
+      WHERE fuel = '{fuel}' AND price_date BETWEEN '{year}-01-01' AND '{year}-12-31' GROUP BY city ORDER BY city
+    params:
+      fuel: {kind: list, values: [petrol, diesel]}
+      year: {kind: years, start: 2018, end: 2025}
+  - id: days_diesel_over_petrol
+    complexity: join
+    questions:
+      - "On how many days in {year} did diesel cost more than petrol in {city}?"
+      - "Count of days in {year} when diesel was pricier than petrol in {city}"
+    sql: >-
+      SELECT COUNT(*) AS days FROM data.fuel_prices_metro p
+      JOIN data.fuel_prices_metro d ON d.price_date = p.price_date AND d.city = p.city AND d.fuel = 'diesel'
+      WHERE p.city = '{city}' AND p.fuel = 'petrol' AND p.price_date BETWEEN '{year}-01-01' AND '{year}-12-31'
+        AND d.price_inr_per_litre > p.price_inr_per_litre
+    params:
+      city: {kind: list, values: [Delhi, Mumbai, Chennai, Kolkata]}
+      year: {kind: years, start: 2018, end: 2025}

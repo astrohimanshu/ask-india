@@ -13,8 +13,8 @@ def test_chat_example_matches_runtime_contract() -> None:
     ex = to_chat_example(
         ctx["census_2011_pca"], "Population of Bihar?", "SELECT 1 FROM data.census_2011_pca"
     )
-    assert ex["messages"][0]["content"] == prompts.SQL_SYSTEM
-    assert "### Dataset census_2011_pca" in ex["messages"][1]["content"]
-    assert ex["messages"][1]["content"].endswith("Question: Population of Bihar?")
-    draft = SQLDraft.model_validate(json.loads(ex["messages"][2]["content"]))
+    assert ex["prompt"][0]["content"] == prompts.SQL_SYSTEM
+    assert "### Dataset census_2011_pca" in ex["prompt"][1]["content"]
+    assert ex["prompt"][1]["content"].endswith("Question: Population of Bihar?")
+    draft = SQLDraft.model_validate(json.loads(ex["completion"][0]["content"]))
     assert draft.sql == "SELECT 1 FROM data.census_2011_pca"

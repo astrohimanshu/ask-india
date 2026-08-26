@@ -1,0 +1,159 @@
+dataset: dgca_airline_traffic
+templates:
+  - id: airline_month_passengers
+    complexity: filter
+    questions:
+      - "How many domestic passengers did {airline} carry in the month starting {period}?"
+      - "{airline} scheduled domestic passengers, month of {period}"
+    sql: >-
+      SELECT passengers_carried FROM data.dgca_airline_traffic
+      WHERE airline = '{airline}' AND segment = 'scheduled_domestic' AND period = '{period}'
+    params:
+      airline: {kind: column, source: data.dgca_airline_traffic.airline, where: "segment = 'scheduled_domestic' AND airline <> 'All Airlines' AND passengers_carried IS NOT NULL"}
+      period: {kind: column, source: data.dgca_airline_traffic.period, where: "period >= '2022-01-01'"}
+  - id: airline_year_passengers
+    complexity: group
+    questions:
+      - "How many domestic passengers did {airline} carry in {year}?"
+      - "{airline} total domestic passengers in calendar year {year}"
+      - "Passengers flown by {airline} on domestic routes in {year}"
+    sql: >-
+      SELECT SUM(passengers_carried) AS passengers FROM data.dgca_airline_traffic
+      WHERE airline = '{airline}' AND segment = 'scheduled_domestic'
+        AND period BETWEEN '{year}-01-01' AND '{year}-12-01'
+    params:
+      airline: {kind: column, source: data.dgca_airline_traffic.airline, where: "segment = 'scheduled_domestic' AND airline <> 'All Airlines' AND passengers_carried IS NOT NULL AND period >= '2023-01-01'"}
+      year: {kind: years, start: 2019, end: 2025}
+  - id: industry_year_total
+    complexity: group
+    questions:
+      - "How many domestic passengers did Indian airlines carry in total in {year}?"
+      - "Total scheduled domestic air passengers in India, {year}"
+      - "India domestic air traffic {year} (all airlines)"
+    sql: >-
+      SELECT SUM(passengers_carried) AS passengers FROM data.dgca_airline_traffic
+      WHERE airline = 'All Airlines' AND segment = 'scheduled_domestic'
+        AND period BETWEEN '{year}-01-01' AND '{year}-12-01'
+    params:
+      year: {kind: years, start: 2019, end: 2025}
+  - id: market_share_year
+    complexity: join
+    questions:
+      - "What was {airline}'s share of domestic passengers in {year}?"
+      - "{airline} domestic market share in {year}, in percent"
+      - "How big was {airline}'s domestic market share in calendar {year}?"
+    sql: >-
+      SELECT ROUND(SUM(a.passengers_carried) * 100.0 / SUM(t.passengers_carried), 2) AS market_share_pct
+      FROM data.dgca_airline_traffic a
+      JOIN data.dgca_airline_traffic t ON t.period = a.period AND t.segment = a.segment AND t.airline = 'All Airlines'
+      WHERE a.airline = '{airline}' AND a.segment = 'scheduled_domestic'
+        AND a.period BETWEEN '{year}-01-01' AND '{year}-12-01'
+    params:
+      airline: {kind: column, source: data.dgca_airline_traffic.airline, where: "segment = 'scheduled_domestic' AND airline <> 'All Airlines' AND passengers_carried IS NOT NULL AND period >= '2023-01-01'"}
+      year: {kind: years, start: 2023, end: 2025}
+  - id: top_airlines_month
+    complexity: rank
+    questions:
+      - "Which airline carried the most domestic passengers in the month starting {period}?"
+      - "Largest domestic airline by passengers, month of {period}"
+    sql: >-
+      SELECT airline, passengers_carried FROM data.dgca_airline_traffic
+      WHERE period = '{period}' AND segment = 'scheduled_domestic' AND airline <> 'All Airlines'
+      ORDER BY passengers_carried DESC NULLS LAST LIMIT 1
+    params:
+      period: {kind: column, source: data.dgca_airline_traffic.period, where: "period >= '2020-01-01'"}
+  - id: top_n_airlines_year
+    complexity: rank
+    questions:
+      - "Which {n} airlines carried the most domestic passengers in {year}?"
+      - "Top {n} Indian airlines by domestic passengers, {year}"
+    sql: >-
+      SELECT airline, SUM(passengers_carried) AS passengers FROM data.dgca_airline_traffic
+      WHERE segment = 'scheduled_domestic' AND airline <> 'All Airlines'
+        AND period BETWEEN '{year}-01-01' AND '{year}-12-01'
+      GROUP BY airline ORDER BY passengers DESC NULLS LAST LIMIT {n}
+    params:
+      n: {kind: list, values: ["3", "5"]}
+      year: {kind: years, start: 2019, end: 2025}
+  - id: load_factor_month
+    complexity: rank
+    questions:
+      - "Which airline had the highest domestic passenger load factor in the month starting {period}?"
+      - "Best load factor among domestic airlines, month of {period}"
+    sql: >-
+      SELECT airline, passenger_load_factor_pct FROM data.dgca_airline_traffic
+      WHERE period = '{period}' AND segment = 'scheduled_domestic' AND airline <> 'All Airlines'
+        AND passenger_load_factor_pct IS NOT NULL
+      ORDER BY passenger_load_factor_pct DESC LIMIT 1
+    params:
+      period: {kind: column, source: data.dgca_airline_traffic.period, where: "period >= '2021-01-01'"}
+  - id: airline_load_factor_year
+    complexity: group
+    questions:
+      - "What was {airline}'s average domestic passenger load factor in {year}?"
+      - "{airline} PLF on domestic routes, {year}"
+    sql: >-
+      SELECT ROUND(AVG(passenger_load_factor_pct), 2) AS avg_plf_pct FROM data.dgca_airline_traffic
+      WHERE airline = '{airline}' AND segment = 'scheduled_domestic'
+        AND period BETWEEN '{year}-01-01' AND '{year}-12-01' AND passenger_load_factor_pct IS NOT NULL
+    params:
+      airline: {kind: column, source: data.dgca_airline_traffic.airline, where: "segment = 'scheduled_domestic' AND airline <> 'All Airlines' AND passenger_load_factor_pct IS NOT NULL AND period >= '2023-01-01'"}
+      year: {kind: years, start: 2022, end: 2025}
+  - id: monthly_trend_year
+    complexity: group
+    questions:
+      - "How did domestic air passenger numbers change month by month in {year}?"
+      - "Monthly domestic passengers for all airlines during {year}"
+    sql: >-
+      SELECT period, passengers_carried FROM data.dgca_airline_traffic
+      WHERE airline = 'All Airlines' AND segment = 'scheduled_domestic'
+        AND period BETWEEN '{year}-01-01' AND '{year}-12-01' ORDER BY period
+    params:
+      year: {kind: years, start: 2019, end: 2025}
+  - id: yoy_change_industry
+    complexity: derived
+    questions:
+      - "By what percentage did total domestic passengers change from {year1} to {year2}?"
+      - "Growth in India's domestic air traffic between {year1} and {year2}, in percent"
+    sql: >-
+      SELECT ROUND((SUM(CASE WHEN period BETWEEN '{year2}-01-01' AND '{year2}-12-01' THEN passengers_carried END)
+                  - SUM(CASE WHEN period BETWEEN '{year1}-01-01' AND '{year1}-12-01' THEN passengers_carried END)) * 100.0
+                  / SUM(CASE WHEN period BETWEEN '{year1}-01-01' AND '{year1}-12-01' THEN passengers_carried END), 2) AS change_pct
+      FROM data.dgca_airline_traffic WHERE airline = 'All Airlines' AND segment = 'scheduled_domestic'
+    params:
+      year1: {kind: list, values: ["2019", "2020", "2021", "2022", "2023"]}
+      year2: {kind: list, values: ["2022", "2023", "2024", "2025"]}
+  - id: international_year
+    complexity: group
+    questions:
+      - "How many passengers did {airline} carry on scheduled international services in {year}?"
+      - "{airline} international passengers in {year}"
+    sql: >-
+      SELECT SUM(passengers_carried) AS passengers FROM data.dgca_airline_traffic
+      WHERE airline = '{airline}' AND segment = 'scheduled_international'
+        AND period BETWEEN '{year}-01-01' AND '{year}-12-01'
+    params:
+      airline: {kind: column, source: data.dgca_airline_traffic.airline, where: "segment = 'scheduled_international' AND airline <> 'All Airlines' AND passengers_carried IS NOT NULL AND period >= '2023-01-01'"}
+      year: {kind: years, start: 2022, end: 2025}
+  - id: departures_month
+    complexity: filter
+    questions:
+      - "How many domestic departures did {airline} operate in the month starting {period}?"
+      - "{airline} domestic flights (departures) in the month of {period}"
+    sql: >-
+      SELECT departures FROM data.dgca_airline_traffic
+      WHERE airline = '{airline}' AND segment = 'scheduled_domestic' AND period = '{period}' AND departures IS NOT NULL
+    params:
+      airline: {kind: column, source: data.dgca_airline_traffic.airline, where: "segment = 'scheduled_domestic' AND airline <> 'All Airlines' AND departures IS NOT NULL AND period >= '2023-01-01'"}
+      period: {kind: column, source: data.dgca_airline_traffic.period, where: "period >= '2023-01-01'"}
+  - id: airline_yearly_trend
+    complexity: group
+    questions:
+      - "How have {airline}'s yearly domestic passenger numbers changed since 2019?"
+      - "Year-wise domestic passengers carried by {airline}"
+    sql: >-
+      SELECT EXTRACT(YEAR FROM period)::int AS year, SUM(passengers_carried) AS passengers
+      FROM data.dgca_airline_traffic WHERE airline = '{airline}' AND segment = 'scheduled_domestic'
+      GROUP BY 1 ORDER BY 1
+    params:
+      airline: {kind: column, source: data.dgca_airline_traffic.airline, where: "segment = 'scheduled_domestic' AND airline <> 'All Airlines' AND passengers_carried IS NOT NULL AND period >= '2023-01-01'"}

@@ -93,8 +93,8 @@ def main() -> int:
         save_strategy="epoch",
         save_total_limit=2,
         max_length=args.max_len,
-        assistant_only_loss=True,
-        warmup_ratio=0.03,
+        completion_only_loss=True,
+        warmup_steps=10,
         lr_scheduler_type="cosine",
         report_to=[],
         model_init_kwargs={

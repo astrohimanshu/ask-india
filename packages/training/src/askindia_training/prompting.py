@@ -47,10 +47,11 @@ def target_message(sql: str, assumptions: list[str] | None = None) -> str:
 
 
 def to_chat_example(context: str, question: str, sql: str) -> dict[str, list[dict[str, str]]]:
+    """Prompt/completion conversational format: the trainer computes loss on the completion only."""
     return {
-        "messages": [
+        "prompt": [
             {"role": "system", "content": prompts.SQL_SYSTEM},
             {"role": "user", "content": user_message(context, question)},
-            {"role": "assistant", "content": target_message(sql)},
-        ]
+        ],
+        "completion": [{"role": "assistant", "content": target_message(sql)}],
     }
