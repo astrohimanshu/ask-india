@@ -28,6 +28,17 @@ class Settings(BaseSettings):
     azure_openai_api_key: SecretStr | None = None
     azure_openai_endpoint: str | None = None
 
+    llm_max_retries: int = Field(
+        default=4,
+        ge=0,
+        le=10,
+        description="Retries after a provider throttles or briefly fails. Hosted free tiers are "
+        "metered per minute, so throttling is normal traffic, not an error.",
+    )
+    llm_retry_cap_seconds: float = Field(
+        default=30.0, gt=0, description="Longest single wait between retries."
+    )
+
     langfuse_public_key: SecretStr | None = None
     langfuse_secret_key: SecretStr | None = None
     langfuse_base_url: str = "https://cloud.langfuse.com"
