@@ -17,6 +17,7 @@ from typing import Any, Protocol
 import litellm
 from litellm.exceptions import (
     APIConnectionError,
+    BadRequestError,
     InternalServerError,
     RateLimitError,
     ServiceUnavailableError,
@@ -42,6 +43,10 @@ RETRYABLE: tuple[type[Exception], ...] = (
 #: Groq states the wait inside the error message ("Please try again in 787.5ms"); other providers
 #: use a `retry_after` attribute. Both are preferred over guessing.
 _RETRY_AFTER_TEXT = re.compile(r"try again in\s+([0-9.]+)\s*(ms|s)\b", re.IGNORECASE)
+
+#: A provider that enforces JSON mode rejects its own model's bad output with a 400 rather than
+#: returning the text. That is a contract violation like any other, not a transport failure.
+_JSON_MODE_REJECTED = "json_validate_failed"
 
 
 class ContractViolationError(ValueError):
@@ -107,6 +112,7 @@ class LiteLLMClient:
         ollama_base_url: str | None = None,
         max_retries: int | None = None,
         retry_cap_seconds: float | None = None,
+        fallback_model: str | None = None,
         sleep: Callable[[float], None] = time.sleep,
     ) -> None:
         settings = get_settings()
@@ -115,6 +121,7 @@ class LiteLLMClient:
         self.retry_cap_seconds = (
             settings.llm_retry_cap_seconds if retry_cap_seconds is None else retry_cap_seconds
         )
+        self.fallback_model = settings.fallback_model if fallback_model is None else fallback_model
         self._sleep = sleep
 
     def _completion_with_retry(self, **kwargs: Any) -> Any:
@@ -127,11 +134,29 @@ class LiteLLMClient:
         for attempt in range(1, self.max_retries + 2):
             try:
                 return litellm.completion(**kwargs)
+            except BadRequestError as e:
+                if _JSON_MODE_REJECTED in str(e):
+                    raise ContractViolationError(
+                        f"provider rejected the model's JSON: {str(e)[:200]}"
+                    ) from e
+                raise
             except RETRYABLE as e:
                 if attempt > self.max_retries:
                     raise
                 self._sleep(retry_delay(e, attempt, self.retry_cap_seconds))
         raise AssertionError("unreachable")  # pragma: no cover
+
+    def _call(self, model: str, messages: list[dict[str, str]], **rest: Any) -> Any:
+        extra: dict[str, Any] = {}
+        if model.startswith("ollama/"):
+            extra["api_base"] = self.ollama_base_url
+        return self._completion_with_retry(
+            model=model,
+            messages=messages,
+            response_format={"type": "json_object"},
+            **rest,
+            **extra,
+        )
 
     def complete_json[T: BaseModel](
         self,
@@ -144,9 +169,6 @@ class LiteLLMClient:
         max_tokens: int = 1024,
         metadata: dict[str, str] | None = None,
     ) -> T:
-        kwargs: dict[str, object] = {}
-        if model.startswith("ollama/"):
-            kwargs["api_base"] = self.ollama_base_url
         messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
         with tracing.observation(
             (metadata or {}).get("node", "llm"),
@@ -156,18 +178,25 @@ class LiteLLMClient:
             metadata=metadata,
             model_parameters={"temperature": temperature, "max_tokens": max_tokens},
         ) as gen:
-            response = self._completion_with_retry(
-                model=model,
-                messages=messages,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                response_format={"type": "json_object"},
-                **kwargs,
-            )
+            used = model
+            try:
+                response = self._call(
+                    model, messages, temperature=temperature, max_tokens=max_tokens
+                )
+            except RETRYABLE:
+                # The primary is throttled past its ceiling — a free tier's daily budget, most
+                # likely. A slower answer from the fallback beats no answer at all.
+                if not self.fallback_model or self.fallback_model == model:
+                    raise
+                used = self.fallback_model
+                response = self._call(
+                    used, messages, temperature=temperature, max_tokens=max_tokens
+                )
             content = response.choices[0].message.content or ""
             if gen is not None:
                 usage = getattr(response, "usage", None)
                 gen.update(
+                    model=used,
                     output=content,
                     usage_details={
                         "input": getattr(usage, "prompt_tokens", 0) or 0,

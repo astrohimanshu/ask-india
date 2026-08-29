@@ -6,6 +6,7 @@ from typing import Any
 
 import litellm
 import pytest
+from litellm.exceptions import BadRequestError
 from pydantic import BaseModel
 
 from askindia_agents.llm import ContractViolationError, LiteLLMClient, retry_delay
@@ -53,7 +54,9 @@ def _client(
         return item
 
     monkeypatch.setattr(litellm, "completion", fake_completion)
-    client = LiteLLMClient(max_retries=3, retry_cap_seconds=5.0, sleep=slept.append)
+    client = LiteLLMClient(
+        max_retries=3, retry_cap_seconds=5.0, fallback_model="", sleep=slept.append
+    )
     return client, slept
 
 
@@ -96,3 +99,69 @@ def test_delay_backs_off_when_the_provider_says_nothing() -> None:
 def test_delay_never_exceeds_the_cap() -> None:
     assert retry_delay(_rate_limited("try again in 600s."), attempt=1, cap_seconds=30.0) == 30.0
     assert retry_delay(_rate_limited("nothing stated"), attempt=9, cap_seconds=30.0) == 30.0
+
+
+def test_provider_rejecting_its_own_json_is_a_contract_violation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A provider enforcing JSON mode answers with 400, not with malformed text. The graph
+    already knows how to fail closed on a contract violation; it must not see a crash instead."""
+    bad = BadRequestError(
+        message='{"code":"json_validate_failed","failed_generation":""}',
+        llm_provider="groq",
+        model="m",
+    )
+    client, slept = _client(monkeypatch, [bad])
+    with pytest.raises(ContractViolationError):
+        client.complete_json(model="groq/x", system="s", user="u", schema=Shape)
+    assert slept == [], "a contract violation is not retried"
+
+
+def test_other_bad_requests_still_surface(monkeypatch: pytest.MonkeyPatch) -> None:
+    oops = BadRequestError(message="context length exceeded", llm_provider="groq", model="m")
+    client, _ = _client(monkeypatch, [oops])
+    with pytest.raises(BadRequestError):
+        client.complete_json(model="groq/x", system="s", user="u", schema=Shape)
+
+
+def test_falls_back_when_the_primary_is_exhausted(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A daily budget running out must degrade to a slower model, not to no answer."""
+    outcomes = [_rate_limited()] * 4 + [_reply('{"ok": true}')]
+    slept: list[float] = []
+    calls = iter(outcomes)
+    seen: list[str] = []
+
+    def fake_completion(**kw: Any) -> Any:
+        seen.append(str(kw["model"]))
+        item = next(calls)
+        if isinstance(item, Exception):
+            raise item
+        return item
+
+    monkeypatch.setattr(litellm, "completion", fake_completion)
+    client = LiteLLMClient(
+        max_retries=3,
+        retry_cap_seconds=5.0,
+        fallback_model="ollama/small",
+        sleep=slept.append,
+    )
+    out = client.complete_json(model="groq/x", system="s", user="u", schema=Shape)
+    assert out.ok is True
+    assert seen == ["groq/x"] * 4 + ["ollama/small"], "primary exhausted, then the fallback"
+
+
+def test_no_fallback_configured_means_the_error_surfaces(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, _ = _client(monkeypatch, [_rate_limited()] * 4)
+    client.fallback_model = None
+    with pytest.raises(litellm.RateLimitError):
+        client.complete_json(model="groq/x", system="s", user="u", schema=Shape)
+
+
+def test_fallback_equal_to_primary_is_not_retried(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Falling back to the model that just ran out would only spend the wait twice."""
+    client, _ = _client(monkeypatch, [_rate_limited()] * 4)
+    client.fallback_model = "groq/x"
+    with pytest.raises(litellm.RateLimitError):
+        client.complete_json(model="groq/x", system="s", user="u", schema=Shape)

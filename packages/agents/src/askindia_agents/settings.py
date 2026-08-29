@@ -38,6 +38,11 @@ class Settings(BaseSettings):
     llm_retry_cap_seconds: float = Field(
         default=30.0, gt=0, description="Longest single wait between retries."
     )
+    fallback_model: str | None = Field(
+        default=None,
+        description="Used when the primary model is throttled past its ceiling. A hosted free "
+        "tier has a daily budget; when it runs out a slower local answer beats no answer.",
+    )
 
     langfuse_public_key: SecretStr | None = None
     langfuse_secret_key: SecretStr | None = None

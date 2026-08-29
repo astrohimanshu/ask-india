@@ -9,6 +9,7 @@ ENV_REF="${AZ_ENV_ID:-$AZ_ENV}"
 secret() { az keyvault secret show --vault-name "$AZ_KV" -n "$1" --query value -o tsv; }
 DB_URL=$(secret DATABASE-URL); DB_URL_RO=$(secret DATABASE-URL-RO)
 LF_PK=$(secret LANGFUSE-PUBLIC-KEY); LF_SK=$(secret LANGFUSE-SECRET-KEY)
+GROQ_KEY=$(secret GROQ-API-KEY)
 
 # Create the app, or update it in place. `az containerapp update` does not accept --env-vars or
 # --secrets (those exist only on create), so an update sets secrets first and then passes the
@@ -38,11 +39,12 @@ upsert ollama "$OLLAMA_IMAGE" internal 11434 4.0 8.0Gi 0 1 \
   OLLAMA_KEEP_ALIVE=30m OLLAMA_NUM_PARALLEL=1
 OLLAMA_FQDN=$(az containerapp show -g "$AZ_RG" -n ollama --query properties.configuration.ingress.fqdn -o tsv)
 
-SECRETS=("database-url=$DB_URL" "database-url-ro=$DB_URL_RO" "lf-pk=$LF_PK" "lf-sk=$LF_SK")
+SECRETS=("database-url=$DB_URL" "database-url-ro=$DB_URL_RO"
+         "lf-pk=$LF_PK" "lf-sk=$LF_SK" "groq-api-key=$GROQ_KEY")
 upsert api "$API_IMAGE" external 8000 1.0 2.0Gi 0 2 \
   DATABASE_URL=secretref:database-url DATABASE_URL_RO=secretref:database-url-ro \
   LANGFUSE_PUBLIC_KEY=secretref:lf-pk LANGFUSE_SECRET_KEY=secretref:lf-sk \
-  LANGFUSE_BASE_URL=https://cloud.langfuse.com \
+  LANGFUSE_BASE_URL=https://cloud.langfuse.com GROQ_API_KEY=secretref:groq-api-key \
   OLLAMA_BASE_URL="https://${OLLAMA_FQDN}" SQL_MODEL="$PROD_MODEL" CHAT_MODEL="$PROD_MODEL" \
   SQL_TIMEOUT_SECONDS=10 RATE_LIMIT=10/minute
 API_FQDN=$(az containerapp show -g "$AZ_RG" -n api --query properties.configuration.ingress.fqdn -o tsv)
