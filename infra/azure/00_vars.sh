@@ -17,5 +17,9 @@ export IMAGE_TAG="${IMAGE_TAG:-latest}"
 export API_IMAGE="ghcr.io/astrohimanshu/ask-india-api:${IMAGE_TAG}"
 export WEB_IMAGE="ghcr.io/astrohimanshu/ask-india-web:${IMAGE_TAG}"
 export OLLAMA_IMAGE="ghcr.io/astrohimanshu/ask-india-ollama:${IMAGE_TAG}"
-export PROD_MODEL="${PROD_MODEL:-ollama/qwen2.5-coder:3b}"
+# The hosted model is fast and accurate but metered — a free tier allows roughly 60 questions
+# a day. FALLBACK_MODEL is the CPU container already deployed beside the API: slower, less
+# accurate, always available. Past the daily ceiling the site degrades instead of failing.
+export PROD_MODEL="${PROD_MODEL:-groq/openai/gpt-oss-120b}"
+export PROD_FALLBACK_MODEL="${PROD_FALLBACK_MODEL:-ollama/qwen2.5-coder:3b}"
 export BUDGET_EMAIL="${BUDGET_EMAIL:-himanshu.252cd007@nitk.edu.in}"

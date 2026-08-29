@@ -46,6 +46,7 @@ upsert api "$API_IMAGE" external 8000 1.0 2.0Gi 0 2 \
   LANGFUSE_PUBLIC_KEY=secretref:lf-pk LANGFUSE_SECRET_KEY=secretref:lf-sk \
   LANGFUSE_BASE_URL=https://cloud.langfuse.com GROQ_API_KEY=secretref:groq-api-key \
   OLLAMA_BASE_URL="https://${OLLAMA_FQDN}" SQL_MODEL="$PROD_MODEL" CHAT_MODEL="$PROD_MODEL" \
+  FALLBACK_MODEL="$PROD_FALLBACK_MODEL" \
   SQL_TIMEOUT_SECONDS=10 RATE_LIMIT=10/minute
 API_FQDN=$(az containerapp show -g "$AZ_RG" -n api --query properties.configuration.ingress.fqdn -o tsv)
 
