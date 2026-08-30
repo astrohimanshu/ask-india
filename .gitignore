@@ -33,3 +33,6 @@ out/
 .vscode/
 .idea/
 .DS_Store
+
+# Database snapshots for the offline demo: data, not code.
+*.dump

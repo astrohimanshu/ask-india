@@ -1,0 +1,61 @@
+# Azure-independent demo stack, run on the cluster. Exercises the exact images that are
+# published to GHCR and deployed to Container Apps, against a restored snapshot of the real
+# database — so the deployment can be demonstrated when Azure is unavailable.
+#
+#   cd infra/demo
+#   docker compose -f compose.demo.yaml up -d db
+#   ./restore.sh                       # loads ~/demo/askindia-data.dump
+#   docker compose -f compose.demo.yaml up -d
+#
+# Reach it from a laptop with:  ssh -L 8001:localhost:8001 cluster
+#
+# The model is qwen2.5-coder:3b, baked into the ollama image so nothing downloads at run time.
+# It is the model the public deployment uses, and the weakest of the three: expect ~40 %
+# execution accuracy, ~40 s per answer on CPU, and over-conservative triage on claims. For the
+# 7B stack with the real eval numbers, use the development stack on ports 8000/3000 instead.
+name: askindia-demo
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DEMO_PG_PASSWORD:-demo}
+      POSTGRES_DB: askindia
+    ports:
+      - "127.0.0.1:${DEMO_DB_PORT:-5433}:5432"
+    volumes:
+      - demodata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d askindia"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  ollama:
+    image: ghcr.io/astrohimanshu/ask-india-ollama:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${DEMO_OLLAMA_PORT:-11435}:11434"
+
+  api:
+    image: ghcr.io/astrohimanshu/ask-india-api:latest
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # askindia_ro is the ONLY role agent-generated SQL runs as: SELECT-only, read-only
+      # transactions, 10 s statement timeout. That is enforced in the database, not the app.
+      DATABASE_URL: postgresql://askindia_app:${DEMO_PG_PASSWORD:-demo}@db:5432/askindia
+      DATABASE_URL_RO: postgresql://askindia_ro:${DEMO_PG_PASSWORD:-demo}@db:5432/askindia
+      OLLAMA_BASE_URL: http://ollama:11434
+      SQL_MODEL: ollama/qwen2.5-coder:3b
+      CHAT_MODEL: ollama/qwen2.5-coder:3b
+      WEB_ORIGIN: http://localhost:${DEMO_WEB_PORT:-3002}
+    ports:
+      - "127.0.0.1:${DEMO_API_PORT:-8001}:8000"
+
+volumes:
+  demodata:
